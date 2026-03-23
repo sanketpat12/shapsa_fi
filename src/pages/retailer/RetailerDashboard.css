@@ -1,0 +1,38 @@
+.retailer-dashboard {
+  padding-top: 32px;
+  padding-bottom: 60px;
+}
+
+.dashboard-stats {
+  margin-bottom: 36px;
+}
+
+.low-stock-section {
+  margin-bottom: 36px;
+}
+
+.low-stock-section .section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.low-stock-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.low-stock-card {
+  padding: 16px 20px;
+}
+
+.recent-orders-section {
+  margin-bottom: 36px;
+}
+
+.section-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+}

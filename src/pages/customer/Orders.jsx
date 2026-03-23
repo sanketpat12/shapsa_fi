@@ -1,0 +1,79 @@
+import { useAuth } from '../../context/AuthContext';
+import orders from '../../data/orders';
+import { FiPackage, FiTruck, FiCheckCircle, FiClock } from 'react-icons/fi';
+
+export default function Orders() {
+  const { user } = useAuth();
+  const userOrders = orders.filter(o => o.customerId === user.id);
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'Delivered': return <FiCheckCircle />;
+      case 'Shipped': return <FiTruck />;
+      case 'Processing': return <FiPackage />;
+      default: return <FiClock />;
+    }
+  };
+
+  return (
+    <div className="page-container animate-fade-in" style={{ paddingTop: 32, paddingBottom: 60 }}>
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">My Orders</h1>
+          <p className="page-subtitle">{userOrders.length} orders placed</p>
+        </div>
+      </div>
+
+      {userOrders.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-icon">📦</div>
+          <h3>No orders yet</h3>
+          <p>Your order history will appear here once you make a purchase.</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {userOrders.map(order => (
+            <div key={order.id} className="card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', background: 'var(--accent-light)', borderBottom: '1px solid var(--border-light)' }}>
+                <div style={{ display: 'flex', gap: 32, fontSize: '0.85rem' }}>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)' }}>Order ID</span>
+                    <p style={{ fontWeight: 700, color: 'var(--text-dark)' }}>{order.id}</p>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)' }}>Date</span>
+                    <p style={{ fontWeight: 600, color: 'var(--text-dark)' }}>{order.date}</p>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)' }}>Total</span>
+                    <p style={{ fontWeight: 700, color: 'var(--text-dark)' }}>${order.total}</p>
+                  </div>
+                </div>
+                <span className={`status-pill ${order.status.toLowerCase()}`}>
+                  <span className="status-dot"></span>
+                  {order.status}
+                </span>
+              </div>
+              <div style={{ padding: 24 }}>
+                {order.items.map((item, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: i < order.items.length - 1 ? 16 : 0 }}>
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                      style={{ width: 60, height: 60, borderRadius: 'var(--radius-sm)', objectFit: 'cover' }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontWeight: 600, color: 'var(--text-dark)' }}>{item.name}</p>
+                      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Qty: {item.quantity}</p>
+                    </div>
+                    <p style={{ fontWeight: 700 }}>${item.price * item.quantity}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
