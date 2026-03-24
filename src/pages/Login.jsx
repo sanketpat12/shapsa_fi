@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { users } from '../data/users';
-import { FiUser, FiShoppingBag, FiShield, FiMail, FiLock, FiArrowRight, FiArrowLeft } from 'react-icons/fi';
+import {
+  FiUser, FiShoppingBag, FiShield, FiMail, FiLock,
+  FiArrowRight, FiArrowLeft, FiEye, FiEyeOff,
+} from 'react-icons/fi';
 import './Login.css';
 
 const roles = [
@@ -12,7 +14,6 @@ const roles = [
     icon: <FiUser />,
     description: 'Shop products, track orders, and discover deals',
     color: '#FF6B35',
-    demo: { email: 'customer@shopsa.com', password: 'customer123' }
   },
   {
     id: 'retailer',
@@ -20,7 +21,6 @@ const roles = [
     icon: <FiShoppingBag />,
     description: 'Manage products, inventory, and track sales',
     color: '#F59E0B',
-    demo: { email: 'retailer@shopsa.com', password: 'retailer123' }
   },
   {
     id: 'admin',
@@ -28,23 +28,24 @@ const roles = [
     icon: <FiShield />,
     description: 'Manage users, monitor platform, and analytics',
     color: '#8B5CF6',
-    demo: { email: 'admin@shopsa.com', password: 'admin123' }
-  }
+  },
 ];
 
 export default function Login() {
   const [selectedRole, setSelectedRole] = useState(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+
+  const { loginWithCredentials } = useAuth();
   const navigate = useNavigate();
 
   const handleRoleSelect = (role) => {
     setSelectedRole(role);
-    setEmail(role.demo.email);
-    setPassword(role.demo.password);
+    setEmail('');
+    setPassword('');
     setError('');
   };
 
@@ -54,12 +55,16 @@ export default function Login() {
     setError('');
 
     setTimeout(() => {
-      const user = users.find(u => u.email === email && u.password === password);
-      if (user) {
-        login(user);
-        navigate(`/${user.role}`);
+      const result = loginWithCredentials(email.trim(), password);
+      if (result.success) {
+        // Ensure logged-in user matches chosen role
+        if (result.user.role !== selectedRole.id) {
+          setError(`This account is registered as a ${result.user.role}, not a ${selectedRole.id}.`);
+        } else {
+          navigate(`/${result.user.role}`);
+        }
       } else {
-        setError('Invalid email or password. Try the demo credentials.');
+        setError(result.error);
       }
       setLoading(false);
     }, 600);
@@ -68,9 +73,9 @@ export default function Login() {
   return (
     <div className="login-page">
       <div className="login-bg-shapes">
-        <div className="shape shape-1"></div>
-        <div className="shape shape-2"></div>
-        <div className="shape shape-3"></div>
+        <div className="shape shape-1" />
+        <div className="shape shape-2" />
+        <div className="shape shape-3" />
       </div>
 
       <div className="login-container">
@@ -84,8 +89,8 @@ export default function Login() {
 
         {!selectedRole ? (
           <div className="role-selection animate-fade-in-up">
-            <h2>Welcome! Choose your role</h2>
-            <p className="role-hint">Select how you want to access the platform</p>
+            <h2>Welcome Back!</h2>
+            <p className="role-hint">Select your role to sign in</p>
             <div className="role-cards">
               {roles.map((role, i) => (
                 <button
@@ -97,12 +102,21 @@ export default function Login() {
                   <div className="role-icon" style={{ background: `${role.color}15`, color: role.color }}>
                     {role.icon}
                   </div>
-                  <h3>{role.label}</h3>
-                  <p>{role.description}</p>
+                  <div>
+                    <h3>{role.label}</h3>
+                    <p>{role.description}</p>
+                  </div>
                   <div className="role-arrow"><FiArrowRight /></div>
                 </button>
               ))}
             </div>
+
+            <p style={{ textAlign: 'center', marginTop: '24px', fontSize: '0.88rem', color: 'var(--text-muted)' }}>
+              Don't have an account?{' '}
+              <Link to="/register" style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                Register here
+              </Link>
+            </p>
           </div>
         ) : (
           <div className="login-form-container animate-fade-in-up">
@@ -114,7 +128,7 @@ export default function Login() {
               <div className="role-icon-sm" style={{ background: `${selectedRole.color}15`, color: selectedRole.color }}>
                 {selectedRole.icon}
               </div>
-              <span>Logging in as <strong>{selectedRole.label}</strong></span>
+              <span>Signing in as <strong>{selectedRole.label}</strong></span>
             </div>
 
             <form onSubmit={handleLogin} className="login-form">
@@ -137,16 +151,29 @@ export default function Login() {
 
               <div className="form-group">
                 <label>Password</label>
-                <div className="input-with-icon">
+                <div className="input-with-icon" style={{ position: 'relative' }}>
                   <FiLock className="input-icon" />
                   <input
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     className="form-input"
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                     placeholder="Enter your password"
+                    style={{ paddingRight: '44px' }}
                     required
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(s => !s)}
+                    style={{
+                      position: 'absolute', right: 14, top: '50%',
+                      transform: 'translateY(-50%)', background: 'none',
+                      border: 'none', cursor: 'pointer', color: 'var(--text-muted)',
+                      fontSize: '1rem', padding: 0,
+                    }}
+                  >
+                    {showPassword ? <FiEyeOff /> : <FiEye />}
+                  </button>
                 </div>
               </div>
 
@@ -156,13 +183,21 @@ export default function Login() {
                 disabled={loading}
                 style={{ background: `linear-gradient(135deg, ${selectedRole.color}, ${selectedRole.color}dd)` }}
               >
-                {loading ? 'Signing in...' : 'Sign In'}
+                {loading ? 'Signing in…' : 'Sign In'}
                 {!loading && <FiArrowRight />}
               </button>
 
+              <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                Don't have an account?{' '}
+                <Link to="/register" style={{ color: selectedRole.color, fontWeight: 600 }}>
+                  Register here
+                </Link>
+              </p>
+
+              {/* Demo credentials hint */}
               <div className="demo-hint">
                 <span className="demo-badge">DEMO</span>
-                Credentials are pre-filled for quick access
+                Use <strong>customer@shopsa.com</strong> / <strong>customer123</strong> (or retailer/admin)
               </div>
             </form>
           </div>

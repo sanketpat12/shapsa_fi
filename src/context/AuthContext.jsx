@@ -1,6 +1,22 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { users as seededUsers } from '../data/users';
 
 const AuthContext = createContext(null);
+
+// Helper: get all registered users from localStorage
+function getRegisteredUsers() {
+  try {
+    const saved = localStorage.getItem('shopsa_registered_users');
+    return saved ? JSON.parse(saved) : [];
+  } catch {
+    return [];
+  }
+}
+
+// Helper: save registered users list to localStorage
+function saveRegisteredUsers(list) {
+  localStorage.setItem('shopsa_registered_users', JSON.stringify(list));
+}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
@@ -27,6 +43,57 @@ export function AuthProvider({ children }) {
 
   const login = (userData) => {
     setUser(userData);
+  };
+
+  /**
+   * Attempt login by email + password.
+   * Checks localStorage registered users first, then seeded users.
+   * Returns { success, user, error }
+   */
+  const loginWithCredentials = (email, password) => {
+    const registered = getRegisteredUsers();
+    const allUsers = [...registered, ...seededUsers];
+    const found = allUsers.find(
+      (u) => u.email.toLowerCase() === email.toLowerCase() && u.password === password
+    );
+    if (found) {
+      login(found);
+      return { success: true, user: found };
+    }
+    return { success: false, error: 'Invalid email or password.' };
+  };
+
+  /**
+   * Register a new user.
+   * Returns { success, error }
+   */
+  const register = (userData) => {
+    const registered = getRegisteredUsers();
+    const allEmails = [
+      ...registered.map((u) => u.email.toLowerCase()),
+      ...seededUsers.map((u) => u.email.toLowerCase()),
+    ];
+
+    if (allEmails.includes(userData.email.toLowerCase())) {
+      return { success: false, error: 'This email is already registered. Please log in.' };
+    }
+
+    const newUser = {
+      ...userData,
+      id: `reg_${Date.now()}`,
+      avatar: userData.name
+        ? userData.name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2)
+        : userData.email.slice(0, 2).toUpperCase(),
+      joinDate: new Date().toISOString().split('T')[0],
+      totalOrders: 0,
+      totalSpent: 0,
+      ...(userData.role === 'retailer' ? { totalProducts: 0, totalRevenue: 0 } : {}),
+    };
+
+    const updated = [...registered, newUser];
+    saveRegisteredUsers(updated);
+    login(newUser);
+    return { success: true, user: newUser };
   };
 
   const logout = () => {
@@ -77,6 +144,8 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider value={{
       user,
       login,
+      loginWithCredentials,
+      register,
       logout,
       cart,
       addToCart,

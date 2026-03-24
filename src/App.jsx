@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
+import Register from './pages/Register';
 
 // Customer pages
 import CustomerDashboard from './pages/customer/CustomerDashboard';
@@ -31,6 +32,7 @@ function AppRoutes() {
       {user && <Navbar />}
       <Routes>
         <Route path="/login" element={user ? <Navigate to={`/${user.role}`} /> : <Login />} />
+        <Route path="/register" element={user ? <Navigate to={`/${user.role}`} /> : <Register />} />
 
         {/* Customer Routes */}
         <Route path="/customer" element={
