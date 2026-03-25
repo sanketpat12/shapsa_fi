@@ -1,105 +1,136 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { users as seededUsers } from '../data/users';
+import { supabase } from '../lib/supabase';
 
 const AuthContext = createContext(null);
 
-// Helper: get all registered users from localStorage
-function getRegisteredUsers() {
-  try {
-    const saved = localStorage.getItem('shopsa_registered_users');
-    return saved ? JSON.parse(saved) : [];
-  } catch {
-    return [];
-  }
-}
-
-// Helper: save registered users list to localStorage
-function saveRegisteredUsers(list) {
-  localStorage.setItem('shopsa_registered_users', JSON.stringify(list));
+// Build a merged user object from Supabase session
+function buildUserFromSession(session) {
+  if (!session?.user) return null;
+  const u = session.user;
+  const meta = u.user_metadata || {};
+  return {
+    id: u.id,
+    email: u.email,
+    name: meta.name || u.email,
+    role: meta.role || 'customer',
+    avatar: meta.avatar || u.email?.slice(0, 2).toUpperCase(),
+    store_name: meta.store_name || null,
+    join_date: meta.join_date || u.created_at?.split('T')[0],
+    total_orders: meta.total_orders || 0,
+    total_spent: meta.total_spent || 0,
+    total_products: meta.total_products || 0,
+    total_revenue: meta.total_revenue || 0,
+  };
 }
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('shopsa_user');
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const [cart, setCart] = useState(() => {
-    const saved = localStorage.getItem('shopsa_cart');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('shopsa_cart');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
   });
 
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem('shopsa_user', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('shopsa_user');
+  // Optionally sync profile to profiles table (non-blocking)
+  const syncProfile = async (authUser, meta) => {
+    try {
+      await supabase.from('profiles').upsert({
+        id: authUser.id,
+        email: authUser.email,
+        name: meta.name,
+        role: meta.role,
+        avatar: meta.avatar,
+        store_name: meta.store_name || null,
+        join_date: meta.join_date,
+        total_orders: 0,
+        total_spent: 0,
+        total_products: 0,
+        total_revenue: 0,
+      }, { onConflict: 'id', ignoreDuplicates: true });
+    } catch {
+      // profiles table may not exist yet — that's OK
     }
-  }, [user]);
+  };
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(buildUserFromSession(session));
+      setLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(buildUserFromSession(session));
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('shopsa_cart', JSON.stringify(cart));
   }, [cart]);
 
-  const login = (userData) => {
-    setUser(userData);
-  };
-
   /**
-   * Attempt login by email + password.
-   * Checks localStorage registered users first, then seeded users.
-   * Returns { success, user, error }
+   * Register: store role/name in Supabase user_metadata — no extra table needed
    */
-  const loginWithCredentials = (email, password) => {
-    const registered = getRegisteredUsers();
-    const allUsers = [...registered, ...seededUsers];
-    const found = allUsers.find(
-      (u) => u.email.toLowerCase() === email.toLowerCase() && u.password === password
-    );
-    if (found) {
-      login(found);
-      return { success: true, user: found };
-    }
-    return { success: false, error: 'Invalid email or password.' };
-  };
+  const register = async (userData) => {
+    const { name, email, password, role, storeName } = userData;
 
-  /**
-   * Register a new user.
-   * Returns { success, error }
-   */
-  const register = (userData) => {
-    const registered = getRegisteredUsers();
-    const allEmails = [
-      ...registered.map((u) => u.email.toLowerCase()),
-      ...seededUsers.map((u) => u.email.toLowerCase()),
-    ];
+    const displayName = role === 'retailer' ? (storeName || name) : name;
+    const avatar = displayName
+      ? displayName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+      : email.slice(0, 2).toUpperCase();
 
-    if (allEmails.includes(userData.email.toLowerCase())) {
-      return { success: false, error: 'This email is already registered. Please log in.' };
-    }
-
-    const newUser = {
-      ...userData,
-      id: `reg_${Date.now()}`,
-      avatar: userData.name
-        ? userData.name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2)
-        : userData.email.slice(0, 2).toUpperCase(),
-      joinDate: new Date().toISOString().split('T')[0],
-      totalOrders: 0,
-      totalSpent: 0,
-      ...(userData.role === 'retailer' ? { totalProducts: 0, totalRevenue: 0 } : {}),
+    const meta = {
+      name: displayName,
+      role,
+      avatar,
+      join_date: new Date().toISOString().split('T')[0],
+      ...(role === 'retailer' ? { store_name: storeName } : {}),
     };
 
-    const updated = [...registered, newUser];
-    saveRegisteredUsers(updated);
-    login(newUser);
-    return { success: true, user: newUser };
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: meta },
+    });
+
+    if (error) {
+      if (error.message.toLowerCase().includes('rate limit')) {
+        return { success: false, error: 'Too many signup attempts. Please wait a few minutes and try again, or use a different email.' };
+      }
+      return { success: false, error: error.message };
+    }
+
+    if (data?.user) {
+      // Non-blocking profile table sync
+      syncProfile(data.user, meta);
+    }
+
+    return { success: true };
   };
 
-  const logout = () => {
+  /**
+   * Login: Supabase signInWithPassword — role is in user_metadata
+   */
+  const loginWithCredentials = async (email, password) => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { success: false, error: 'Invalid email or password.' };
+
+    const u = buildUserFromSession(data);
+    if (!u) return { success: false, error: 'Login failed. Please try again.' };
+
+    return { success: true, role: u.role };
+  };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
     setCart([]);
-    localStorage.removeItem('shopsa_user');
     localStorage.removeItem('shopsa_cart');
   };
 
@@ -108,34 +139,21 @@ export function AuthProvider({ children }) {
       const existing = prev.find(item => item.id === product.id);
       if (existing) {
         return prev.map(item =>
-          item.id === product.id
-            ? { ...item, quantity: item.quantity + quantity }
-            : item
+          item.id === product.id ? { ...item, quantity: item.quantity + quantity } : item
         );
       }
       return [...prev, { ...product, quantity }];
     });
   };
 
-  const removeFromCart = (productId) => {
-    setCart(prev => prev.filter(item => item.id !== productId));
-  };
+  const removeFromCart = (productId) => setCart(prev => prev.filter(item => item.id !== productId));
 
   const updateCartQuantity = (productId, quantity) => {
-    if (quantity <= 0) {
-      removeFromCart(productId);
-      return;
-    }
-    setCart(prev =>
-      prev.map(item =>
-        item.id === productId ? { ...item, quantity } : item
-      )
-    );
+    if (quantity <= 0) { removeFromCart(productId); return; }
+    setCart(prev => prev.map(item => item.id === productId ? { ...item, quantity } : item));
   };
 
-  const clearCart = () => {
-    setCart([]);
-  };
+  const clearCart = () => setCart([]);
 
   const cartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -143,7 +161,7 @@ export function AuthProvider({ children }) {
   return (
     <AuthContext.Provider value={{
       user,
-      login,
+      loading,
       loginWithCredentials,
       register,
       logout,
@@ -153,18 +171,16 @@ export function AuthProvider({ children }) {
       updateCartQuantity,
       clearCart,
       cartTotal,
-      cartCount
+      cartCount,
     }}>
-      {children}
+      {!loading && children}
     </AuthContext.Provider>
   );
 }
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 }
 
