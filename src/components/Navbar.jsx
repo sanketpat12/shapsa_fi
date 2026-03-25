@@ -1,15 +1,30 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { FiSearch, FiShoppingCart, FiUser, FiLogOut, FiMenu, FiX } from 'react-icons/fi';
-import { useState } from 'react';
+import { useNotifications } from '../context/NotificationContext';
+import { FiSearch, FiShoppingCart, FiUser, FiLogOut, FiMenu, FiX, FiBell } from 'react-icons/fi';
+import { useState, useRef, useEffect } from 'react';
 import './Navbar.css';
 
 export default function Navbar() {
   const { user, logout, cartCount } = useAuth();
+  const { notifications, unreadCount, markAllRead, markOneRead } = useNotifications();
   const location = useLocation();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [bellOpen, setBellOpen] = useState(false);
+  const bellRef = useRef(null);
+  const profileRef = useRef(null);
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (bellRef.current && !bellRef.current.contains(e.target)) setBellOpen(false);
+      if (profileRef.current && !profileRef.current.contains(e.target)) setProfileOpen(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -48,6 +63,11 @@ export default function Navbar() {
   const links = getNavLinks();
   const isActive = (path) => location.pathname === path;
 
+  const formatDate = (dateStr) => {
+    const d = new Date(dateStr);
+    return isNaN(d) ? dateStr : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
   return (
     <nav className="navbar">
       <div className="navbar-inner">
@@ -82,11 +102,65 @@ export default function Navbar() {
             </>
           )}
 
+          {/* Notification Bell - visible to customer and retailer */}
+          {user && (user.role === 'customer' || user.role === 'retailer') && (
+            <div className="notification-menu-container" ref={bellRef}>
+              <button
+                className="nav-action-btn notification-btn"
+                onClick={() => { setBellOpen(!bellOpen); setProfileOpen(false); }}
+                title="Notifications"
+              >
+                <FiBell />
+                {unreadCount > 0 && (
+                  <span className="notification-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
+                )}
+              </button>
+
+              {bellOpen && (
+                <div className="notification-dropdown">
+                  <div className="notification-header">
+                    <span className="notification-title">Notifications</span>
+                    {unreadCount > 0 && (
+                      <button className="mark-read-btn" onClick={markAllRead}>
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="notification-list">
+                    {notifications.length === 0 ? (
+                      <div className="notification-empty">
+                        <span>🔔</span>
+                        <p>No notifications yet</p>
+                      </div>
+                    ) : (
+                      notifications.map(notif => (
+                        <div
+                          key={notif.id}
+                          className={`notification-item ${!notif.read ? 'unread' : ''}`}
+                          onClick={() => markOneRead(notif.id)}
+                        >
+                          <span className="notif-icon">{notif.icon}</span>
+                          <div className="notif-body">
+                            <p className="notif-title">{notif.title}</p>
+                            <p className="notif-message">{notif.message}</p>
+                            <p className="notif-time">{formatDate(notif.time)}</p>
+                          </div>
+                          {!notif.read && <span className="notif-dot" />}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {user && (
-            <div className="profile-menu-container">
+            <div className="profile-menu-container" ref={profileRef}>
               <button
                 className="profile-btn"
-                onClick={() => setProfileOpen(!profileOpen)}
+                onClick={() => { setProfileOpen(!profileOpen); setBellOpen(false); }}
               >
                 <div className="profile-avatar">{user.avatar || user.name[0]}</div>
               </button>

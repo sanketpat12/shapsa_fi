@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import products from '../../data/products';
-import { FiAlertTriangle, FiEdit2, FiCheck, FiX, FiSearch } from 'react-icons/fi';
+import { FiAlertTriangle, FiEdit2, FiCheck, FiX, FiSearch, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 import './Inventory.css';
 
 export default function Inventory() {
@@ -15,7 +15,9 @@ export default function Inventory() {
   const [editingId, setEditingId] = useState(null);
   const [editStock, setEditStock] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [filter, setFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [collapsedCategories, setCollapsedCategories] = useState({});
   const [toast, setToast] = useState(null);
 
   const LOW_STOCK_THRESHOLD = 10;
@@ -24,14 +26,35 @@ export default function Inventory() {
   const lowStockCount = inventoryData.filter(p => p.stock <= LOW_STOCK_THRESHOLD).length;
   const criticalCount = inventoryData.filter(p => p.stock <= CRITICAL_THRESHOLD).length;
 
+  // All unique categories for this retailer
+  const allCategories = useMemo(() => {
+    const cats = [...new Set(inventoryData.map(p => p.category))].sort();
+    return cats;
+  }, [inventoryData]);
+
   const filteredProducts = inventoryData.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           p.category.toLowerCase().includes(searchQuery.toLowerCase());
-    if (filter === 'low') return matchesSearch && p.stock <= LOW_STOCK_THRESHOLD && p.stock > CRITICAL_THRESHOLD;
-    if (filter === 'critical') return matchesSearch && p.stock <= CRITICAL_THRESHOLD;
-    if (filter === 'healthy') return matchesSearch && p.stock > LOW_STOCK_THRESHOLD;
-    return matchesSearch;
+    const matchesCategory = categoryFilter === 'all' || p.category === categoryFilter;
+    if (statusFilter === 'low') return matchesSearch && matchesCategory && p.stock <= LOW_STOCK_THRESHOLD && p.stock > CRITICAL_THRESHOLD;
+    if (statusFilter === 'critical') return matchesSearch && matchesCategory && p.stock <= CRITICAL_THRESHOLD;
+    if (statusFilter === 'healthy') return matchesSearch && matchesCategory && p.stock > LOW_STOCK_THRESHOLD;
+    return matchesSearch && matchesCategory;
   });
+
+  // Group by category
+  const groupedProducts = useMemo(() => {
+    return filteredProducts.reduce((acc, product) => {
+      const cat = product.category;
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(product);
+      return acc;
+    }, {});
+  }, [filteredProducts]);
+
+  const toggleCategory = (cat) => {
+    setCollapsedCategories(prev => ({ ...prev, [cat]: !prev[cat] }));
+  };
 
   const handleEdit = (product) => {
     setEditingId(product.id);
@@ -60,12 +83,18 @@ export default function Inventory() {
     return 'var(--success)';
   };
 
+  const categoryEmojis = {
+    'Audio': '🎧', 'Phones': '📱', 'Laptops': '💻', 'Wearables': '⌚',
+    'Gaming': '🎮', 'Camera': '📷', 'Tablets': '📟', 'Smart Home': '🏠',
+    'Accessories': '🔌'
+  };
+
   return (
     <div className="inventory-page page-container animate-fade-in">
       <div className="page-header">
         <div>
           <h1 className="page-title">Inventory Management</h1>
-          <p className="page-subtitle">Monitor and manage your stock levels</p>
+          <p className="page-subtitle">Monitor and manage your stock levels by category</p>
         </div>
       </div>
 
@@ -83,19 +112,19 @@ export default function Inventory() {
 
       {/* Stats Bar */}
       <div className="inventory-stats">
-        <div className="inv-stat" onClick={() => setFilter('all')}>
+        <div className="inv-stat" onClick={() => setStatusFilter('all')}>
           <span className="inv-stat-value">{inventoryData.length}</span>
           <span className="inv-stat-label">Total Products</span>
         </div>
-        <div className="inv-stat healthy" onClick={() => setFilter('healthy')}>
+        <div className="inv-stat healthy" onClick={() => setStatusFilter('healthy')}>
           <span className="inv-stat-value">{inventoryData.filter(p => p.stock > LOW_STOCK_THRESHOLD).length}</span>
           <span className="inv-stat-label">Healthy Stock</span>
         </div>
-        <div className="inv-stat low" onClick={() => setFilter('low')}>
+        <div className="inv-stat low" onClick={() => setStatusFilter('low')}>
           <span className="inv-stat-value">{inventoryData.filter(p => p.stock <= LOW_STOCK_THRESHOLD && p.stock > CRITICAL_THRESHOLD).length}</span>
           <span className="inv-stat-label">Low Stock</span>
         </div>
-        <div className="inv-stat critical" onClick={() => setFilter('critical')}>
+        <div className="inv-stat critical" onClick={() => setStatusFilter('critical')}>
           <span className="inv-stat-value">{criticalCount}</span>
           <span className="inv-stat-label">Critical</span>
         </div>
@@ -114,11 +143,12 @@ export default function Inventory() {
           />
         </div>
         <div className="filter-pills">
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', alignSelf: 'center', marginRight: 4 }}>Status:</span>
           {['all', 'healthy', 'low', 'critical'].map(f => (
             <button
               key={f}
-              className={`category-btn ${filter === f ? 'active' : ''}`}
-              onClick={() => setFilter(f)}
+              className={`category-btn ${statusFilter === f ? 'active' : ''}`}
+              onClick={() => setStatusFilter(f)}
             >
               {f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
@@ -126,78 +156,131 @@ export default function Inventory() {
         </div>
       </div>
 
-      {/* Inventory Table */}
-      <div className="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>Product</th>
-              <th>Category</th>
-              <th>Price</th>
-              <th>Stock Level</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredProducts.map(product => {
-              const status = getStockStatus(product.stock);
-              return (
-                <tr key={product.id} className={product.stock <= CRITICAL_THRESHOLD ? 'critical-row' : ''}>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <img src={product.image} alt={product.name} style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover' }} />
-                      <span style={{ fontWeight: 600 }}>{product.name}</span>
-                    </div>
-                  </td>
-                  <td><span className="badge badge-primary">{product.category}</span></td>
-                  <td style={{ fontWeight: 700 }}>${product.price}</td>
-                  <td>
-                    <div className="stock-cell">
-                      {editingId === product.id ? (
-                        <input
-                          type="number"
-                          className="stock-edit-input"
-                          value={editStock}
-                          onChange={e => setEditStock(e.target.value)}
-                          min="0"
-                          autoFocus
-                        />
-                      ) : (
-                        <>
-                          <span className="stock-number">{product.stock} units</span>
-                          <div className="stock-bar">
-                            <div
-                              className="stock-bar-fill"
-                              style={{
-                                width: `${getStockBarWidth(product.stock)}%`,
-                                background: getStockBarColor(product.stock)
-                              }}
-                            ></div>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                  <td><span className={`badge ${status.class}`}>{status.label}</span></td>
-                  <td>
-                    {editingId === product.id ? (
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button className="btn btn-sm" style={{ background: 'var(--success-bg)', color: 'var(--success)' }} onClick={() => handleSave(product.id)}><FiCheck /></button>
-                        <button className="btn btn-sm" style={{ background: 'var(--danger-bg)', color: 'var(--danger)' }} onClick={() => setEditingId(null)}><FiX /></button>
-                      </div>
-                    ) : (
-                      <button className="btn btn-secondary btn-sm" onClick={() => handleEdit(product)}>
-                        <FiEdit2 /> Update
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      {/* Category Filter Tabs */}
+      <div className="category-filter-row">
+        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', alignSelf: 'center', marginRight: 4 }}>Category:</span>
+        <button
+          className={`category-btn ${categoryFilter === 'all' ? 'active' : ''}`}
+          onClick={() => setCategoryFilter('all')}
+        >
+          All Categories
+        </button>
+        {allCategories.map(cat => (
+          <button
+            key={cat}
+            className={`category-btn ${categoryFilter === cat ? 'active' : ''}`}
+            onClick={() => setCategoryFilter(cat)}
+          >
+            {categoryEmojis[cat] || '📦'} {cat}
+          </button>
+        ))}
       </div>
+
+      {/* Inventory grouped by Category */}
+      {Object.keys(groupedProducts).length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-icon">📦</div>
+          <h3>No products found</h3>
+          <p>Try adjusting your search or filter criteria.</p>
+        </div>
+      ) : (
+        Object.entries(groupedProducts).map(([category, categoryProducts]) => (
+          <div key={category} className="inventory-category-section">
+            <button
+              className="inventory-category-header"
+              onClick={() => toggleCategory(category)}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span className="category-header-emoji">{categoryEmojis[category] || '📦'}</span>
+                <span className="category-header-name">{category}</span>
+                <span className="category-header-count">{categoryProducts.length} item{categoryProducts.length > 1 ? 's' : ''}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {categoryProducts.some(p => p.stock <= CRITICAL_THRESHOLD) && (
+                  <span className="badge badge-danger" style={{ fontSize: '0.72rem' }}>Critical Stock</span>
+                )}
+                {!categoryProducts.some(p => p.stock <= CRITICAL_THRESHOLD) &&
+                  categoryProducts.some(p => p.stock <= LOW_STOCK_THRESHOLD) && (
+                  <span className="badge badge-warning" style={{ fontSize: '0.72rem' }}>Low Stock</span>
+                )}
+                {collapsedCategories[category] ? <FiChevronDown /> : <FiChevronUp />}
+              </div>
+            </button>
+
+            {!collapsedCategories[category] && (
+              <div className="table-container" style={{ marginTop: 0, borderTopLeftRadius: 0, borderTopRightRadius: 0 }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Product</th>
+                      <th>Price</th>
+                      <th>Stock Level</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {categoryProducts.map(product => {
+                      const status = getStockStatus(product.stock);
+                      return (
+                        <tr key={product.id} className={product.stock <= CRITICAL_THRESHOLD ? 'critical-row' : ''}>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                              <img src={product.image} alt={product.name} style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover' }} />
+                              <span style={{ fontWeight: 600 }}>{product.name}</span>
+                            </div>
+                          </td>
+                          <td style={{ fontWeight: 700 }}>${product.price}</td>
+                          <td>
+                            <div className="stock-cell">
+                              {editingId === product.id ? (
+                                <input
+                                  type="number"
+                                  className="stock-edit-input"
+                                  value={editStock}
+                                  onChange={e => setEditStock(e.target.value)}
+                                  min="0"
+                                  autoFocus
+                                />
+                              ) : (
+                                <>
+                                  <span className="stock-number">{product.stock} units</span>
+                                  <div className="stock-bar">
+                                    <div
+                                      className="stock-bar-fill"
+                                      style={{
+                                        width: `${getStockBarWidth(product.stock)}%`,
+                                        background: getStockBarColor(product.stock)
+                                      }}
+                                    ></div>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                          <td><span className={`badge ${status.class}`}>{status.label}</span></td>
+                          <td>
+                            {editingId === product.id ? (
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                <button className="btn btn-sm" style={{ background: 'var(--success-bg)', color: 'var(--success)' }} onClick={() => handleSave(product.id)}><FiCheck /></button>
+                                <button className="btn btn-sm" style={{ background: 'var(--danger-bg)', color: 'var(--danger)' }} onClick={() => setEditingId(null)}><FiX /></button>
+                              </div>
+                            ) : (
+                              <button className="btn btn-secondary btn-sm" onClick={() => handleEdit(product)}>
+                                <FiEdit2 /> Update
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        ))
+      )}
 
       {toast && <div className="toast success">{toast}</div>}
     </div>
