@@ -1,10 +1,12 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { FiArrowRight, FiStar, FiTruck, FiUsers } from 'react-icons/fi';
+import { useTranslation } from 'react-i18next';
 import './CustomerDashboard.css';
 
 export default function CustomerDashboard() {
   const { user } = useAuth();
+  const { t } = useTranslation();
 
   return (
     <div className="customer-dashboard">
@@ -26,10 +28,10 @@ export default function CustomerDashboard() {
 
           <div className="hero-actions">
             <Link to="/customer/products" className="btn btn-primary btn-lg">
-              Shop Now <FiArrowRight />
+              {t('common.buyNow')} <FiArrowRight />
             </Link>
             <Link to="/customer/orders" className="btn btn-secondary btn-lg">
-              My Orders
+              {t('nav.myOrders')}
             </Link>
           </div>
 

@@ -4,10 +4,12 @@ import products from '../../data/products';
 import orders from '../../data/orders';
 import { FiPackage, FiDollarSign, FiAlertTriangle, FiShoppingCart, FiTrendingUp, FiPlus } from 'react-icons/fi';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import './RetailerDashboard.css';
 
 export default function RetailerDashboard() {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const retailerId = user.role === 'retailer' ? (user.id === 3 ? 1 : 2) : 1;
 
   const myProducts = products.filter(p => p.retailerId === retailerId);
@@ -19,8 +21,8 @@ export default function RetailerDashboard() {
     <div className="retailer-dashboard page-container animate-fade-in">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Retailer Dashboard</h1>
-          <p className="page-subtitle">Welcome back, {user.name}</p>
+          <h1 className="page-title">{t('nav.dashboard')}</h1>
+          <p className="page-subtitle">{t('dashboard.welcome')}, {user.name}</p>
         </div>
         <Link to="/retailer/products" className="btn btn-primary">
           <FiPlus /> Add Product
@@ -34,21 +36,21 @@ export default function RetailerDashboard() {
             <FiPackage />
           </div>
           <div className="stat-value">{myProducts.length}</div>
-          <div className="stat-label">Total Products</div>
+          <div className="stat-label">{t('common.totalProducts')}</div>
         </div>
         <div className="stat-card">
           <div className="stat-icon" style={{ background: 'var(--info-bg)', color: 'var(--info)' }}>
             <FiShoppingCart />
           </div>
           <div className="stat-value">{myOrders.length}</div>
-          <div className="stat-label">Total Orders</div>
+          <div className="stat-label">{t('nav.orders')}</div>
         </div>
         <div className="stat-card">
           <div className="stat-icon" style={{ background: 'var(--success-bg)', color: 'var(--success)' }}>
             <FiDollarSign />
           </div>
           <div className="stat-value">${totalRevenue.toLocaleString()}</div>
-          <div className="stat-label">Total Revenue</div>
+          <div className="stat-label">{t('dashboard.revenue')}</div>
         </div>
         <div className="stat-card">
           <div className="stat-icon" style={{ background: lowStockProducts.length > 0 ? 'var(--danger-bg)' : 'var(--success-bg)', color: lowStockProducts.length > 0 ? 'var(--danger)' : 'var(--success)' }}>
@@ -96,7 +98,7 @@ export default function RetailerDashboard() {
       {/* Recent Orders */}
       <div className="recent-orders-section">
         <div className="flex-between" style={{ marginBottom: 20 }}>
-          <h2 className="section-title" style={{ margin: 0 }}>Recent Orders</h2>
+          <h2 className="section-title" style={{ margin: 0 }}>{t('dashboard.recentOrders')}</h2>
           <Link to="/retailer/orders" className="btn btn-outline btn-sm">View All</Link>
         </div>
         <div className="table-container">
@@ -106,8 +108,8 @@ export default function RetailerDashboard() {
                 <th>Order ID</th>
                 <th>Customer</th>
                 <th>Items</th>
-                <th>Total</th>
-                <th>Status</th>
+                <th>{t('common.price')}</th>
+                <th>{t('common.status')}</th>
                 <th>Date</th>
               </tr>
             </thead>

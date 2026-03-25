@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import { FiSearch, FiShoppingCart, FiUser, FiLogOut, FiMenu, FiX, FiBell } from 'react-icons/fi';
 import { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import './Navbar.css';
 
 export default function Navbar() {
@@ -13,14 +14,29 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [bellOpen, setBellOpen] = useState(false);
+  const [langOpen, setLangOpen] = useState(false);
   const bellRef = useRef(null);
   const profileRef = useRef(null);
+  const langRef = useRef(null);
+  const { t, i18n } = useTranslation();
+
+  const languages = [
+    { code: 'en', label: 'English' },
+    { code: 'hi', label: 'हिंदी (Hindi)' },
+    { code: 'mr', label: 'मराठी (Marathi)' },
+    { code: 'gu', label: 'ગુજરાતી (Gujarati)' },
+    { code: 'bn', label: 'বাংলা (Bengali)' },
+    { code: 'ta', label: 'தமிழ் (Tamil)' },
+    { code: 'te', label: 'తెలుగు (Telugu)' },
+    { code: 'kn', label: 'ಕನ್ನಡ (Kannada)' }
+  ];
 
   // Close dropdowns on outside click
   useEffect(() => {
     const handleClick = (e) => {
       if (bellRef.current && !bellRef.current.contains(e.target)) setBellOpen(false);
       if (profileRef.current && !profileRef.current.contains(e.target)) setProfileOpen(false);
+      if (langRef.current && !langRef.current.contains(e.target)) setLangOpen(false);
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
@@ -36,24 +52,24 @@ export default function Navbar() {
     switch (user.role) {
       case 'customer':
         return [
-          { path: '/customer', label: 'Home' },
-          { path: '/customer/products', label: 'Products' },
-          { path: '/customer/orders', label: 'My Orders' },
-          { path: '/customer/deals', label: 'Deals' }
+          { path: '/customer', label: t('nav.home') },
+          { path: '/customer/products', label: t('nav.products') },
+          { path: '/customer/orders', label: t('nav.myOrders') },
+          { path: '/customer/deals', label: t('nav.deals') }
         ];
       case 'retailer':
         return [
-          { path: '/retailer', label: 'Dashboard' },
-          { path: '/retailer/products', label: 'My Products' },
-          { path: '/retailer/inventory', label: 'Inventory' },
-          { path: '/retailer/orders', label: 'Orders' }
+          { path: '/retailer', label: t('nav.dashboard') },
+          { path: '/retailer/products', label: t('nav.myProducts') },
+          { path: '/retailer/inventory', label: t('nav.inventory') },
+          { path: '/retailer/orders', label: t('nav.orders') }
         ];
       case 'admin':
         return [
-          { path: '/admin', label: 'Dashboard' },
-          { path: '/admin/customers', label: 'Customers' },
-          { path: '/admin/retailers', label: 'Retailers' },
-          { path: '/admin/settings', label: 'Settings' }
+          { path: '/admin', label: t('nav.dashboard') },
+          { path: '/admin/customers', label: t('nav.customers') },
+          { path: '/admin/retailers', label: t('nav.retailers') },
+          { path: '/admin/settings', label: t('nav.settings') }
         ];
       default:
         return [];
@@ -102,13 +118,44 @@ export default function Navbar() {
             </>
           )}
 
+          {/* Language Switcher */}
+          <div className="profile-menu-container" ref={langRef}>
+            <button
+              className="nav-action-btn"
+              onClick={() => { setLangOpen(!langOpen); setBellOpen(false); setProfileOpen(false); }}
+              title="Change Language"
+            >
+              🌐 <span style={{fontSize: '0.8rem', fontWeight: 600, marginLeft: 4}}>{i18n.language.toUpperCase()}</span>
+            </button>
+            {langOpen && (
+              <div className="profile-dropdown" style={{ minWidth: '160px' }}>
+                <div className="profile-info" style={{ paddingBottom: 8, marginBottom: 4 }}>
+                  <p className="profile-name" style={{ fontSize: '0.9rem' }}>{t('common.language')}</p>
+                </div>
+                <hr style={{ margin: '4px 0' }} />
+                <div style={{ maxHeight: '250px', overflowY: 'auto' }}>
+                  {languages.map(lang => (
+                    <button 
+                      key={lang.code} 
+                      className={`dropdown-item ${i18n.language === lang.code ? 'active' : ''}`}
+                      onClick={() => { i18n.changeLanguage(lang.code); setLangOpen(false); }}
+                      style={{ padding: '8px 16px', fontSize: '0.9rem', justifyContent: 'flex-start', color: i18n.language === lang.code ? 'var(--primary)' : 'inherit' }}
+                    >
+                      {lang.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Notification Bell - visible to customer and retailer */}
           {user && (user.role === 'customer' || user.role === 'retailer') && (
             <div className="notification-menu-container" ref={bellRef}>
               <button
                 className="nav-action-btn notification-btn"
-                onClick={() => { setBellOpen(!bellOpen); setProfileOpen(false); }}
-                title="Notifications"
+                onClick={() => { setBellOpen(!bellOpen); setProfileOpen(false); setLangOpen(false); }}
+                title={t('nav.notifications')}
               >
                 <FiBell />
                 {unreadCount > 0 && (
@@ -119,7 +166,7 @@ export default function Navbar() {
               {bellOpen && (
                 <div className="notification-dropdown">
                   <div className="notification-header">
-                    <span className="notification-title">Notifications</span>
+                    <span className="notification-title">{t('nav.notifications')}</span>
                     {unreadCount > 0 && (
                       <button className="mark-read-btn" onClick={markAllRead}>
                         Mark all read
@@ -160,7 +207,7 @@ export default function Navbar() {
             <div className="profile-menu-container" ref={profileRef}>
               <button
                 className="profile-btn"
-                onClick={() => { setProfileOpen(!profileOpen); setBellOpen(false); }}
+                onClick={() => { setProfileOpen(!profileOpen); setBellOpen(false); setLangOpen(false); }}
               >
                 <div className="profile-avatar">{user.avatar || user.name[0]}</div>
               </button>
@@ -175,7 +222,7 @@ export default function Navbar() {
                   </div>
                   <hr />
                   <button className="dropdown-item logout" onClick={handleLogout}>
-                    <FiLogOut /> Logout
+                    <FiLogOut /> {t('nav.logout')}
                   </button>
                 </div>
               )}

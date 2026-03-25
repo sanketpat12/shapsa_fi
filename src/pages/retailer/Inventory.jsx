@@ -7,14 +7,8 @@ import {
   FiChevronDown, FiChevronUp, FiPackage, FiTrendingUp,
   FiMapPin, FiBarChart2, FiBox
 } from 'react-icons/fi';
+import { useTranslation } from 'react-i18next';
 import './Inventory.css';
-
-const TABS = [
-  { id: 'stock', label: 'Stock Overview', icon: <FiBox /> },
-  { id: 'deadstock', label: 'Dead Stock', icon: <FiAlertTriangle /> },
-  { id: 'sellwise', label: 'Sell Wise Demand', icon: <FiTrendingUp /> },
-  { id: 'popular', label: 'Popular in Area', icon: <FiMapPin /> },
-];
 
 const MONTHS = ['Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
 const AREAS = ['Mumbai', 'Delhi', 'Bangalore', 'Hyderabad', 'Chennai'];
@@ -33,8 +27,16 @@ function daysSince(dateStr) {
 
 export default function Inventory() {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const retailerId = user.id === 3 ? 1 : 2;
   const myProducts = products.filter(p => p.retailerId === retailerId);
+
+  const TABS = [
+    { id: 'stock', label: t('nav.inventory'), icon: <FiBox /> },
+    { id: 'deadstock', label: t('common.deadStock'), icon: <FiAlertTriangle /> },
+    { id: 'sellwise', label: 'Sell Wise Demand', icon: <FiTrendingUp /> },
+    { id: 'popular', label: 'Popular in Area', icon: <FiMapPin /> },
+  ];
 
   const [activeTab, setActiveTab] = useState('stock');
   const [inventoryData, setInventoryData] = useState(myProducts.map(p => ({ ...p })));
@@ -172,7 +174,7 @@ export default function Inventory() {
     <div className="inventory-page page-container animate-fade-in">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Inventory Management</h1>
+          <h1 className="page-title">{t('nav.inventory')} Management</h1>
           <p className="page-subtitle">Smart insights to manage your stock intelligently</p>
         </div>
       </div>
@@ -193,23 +195,23 @@ export default function Inventory() {
       <div className="inventory-stats">
         <div className="inv-stat" onClick={() => { setActiveTab('stock'); setStatusFilter('all'); }}>
           <span className="inv-stat-value">{inventoryData.length}</span>
-          <span className="inv-stat-label">Total Products</span>
+          <span className="inv-stat-label">{t('common.totalProducts')}</span>
         </div>
         <div className="inv-stat healthy" onClick={() => { setActiveTab('stock'); setStatusFilter('healthy'); }}>
           <span className="inv-stat-value">{inventoryData.filter(p => p.stock > LOW_STOCK_THRESHOLD).length}</span>
-          <span className="inv-stat-label">Healthy Stock</span>
+          <span className="inv-stat-label">{t('common.healthyStock')}</span>
         </div>
         <div className="inv-stat low" onClick={() => { setActiveTab('stock'); setStatusFilter('low'); }}>
           <span className="inv-stat-value">{inventoryData.filter(p => p.stock <= LOW_STOCK_THRESHOLD && p.stock > CRITICAL_THRESHOLD).length}</span>
-          <span className="inv-stat-label">Low Stock</span>
+          <span className="inv-stat-label">{t('common.lowStock')}</span>
         </div>
         <div className="inv-stat critical" onClick={() => { setActiveTab('stock'); setStatusFilter('critical'); }}>
           <span className="inv-stat-value">{criticalCount}</span>
-          <span className="inv-stat-label">Critical</span>
+          <span className="inv-stat-label">{t('common.critical')}</span>
         </div>
         <div className="inv-stat deadstock" onClick={() => setActiveTab('deadstock')}>
           <span className="inv-stat-value">{deadStockProducts.length}</span>
-          <span className="inv-stat-label">Dead Stock</span>
+          <span className="inv-stat-label">{t('common.deadStock')}</span>
         </div>
       </div>
 
