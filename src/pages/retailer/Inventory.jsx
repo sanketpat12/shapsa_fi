@@ -1,7 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import products from '../../data/products';
-import orders from '../../data/orders';
+import { supabase } from '../../lib/supabase';
 import {
   FiAlertTriangle, FiEdit2, FiCheck, FiX, FiSearch,
   FiChevronDown, FiChevronUp, FiPackage, FiTrendingUp,
@@ -16,7 +15,8 @@ const AREAS = ['Mumbai', 'Delhi', 'Bangalore', 'Hyderabad', 'Chennai'];
 const categoryEmojis = {
   'Audio': '🎧', 'Phones': '📱', 'Laptops': '💻', 'Wearables': '⌚',
   'Gaming': '🎮', 'Camera': '📷', 'Tablets': '📟', 'Smart Home': '🏠',
-  'Accessories': '🔌'
+  'Accessories': '🔌', 'Food': '🍔', 'Snacks': '🍿', 'Handcraft': '🎨',
+  'Groceries': '🛒', 'Clothing': '👕'
 };
 
 function daysSince(dateStr) {
@@ -28,8 +28,24 @@ function daysSince(dateStr) {
 export default function Inventory() {
   const { user } = useAuth();
   const { t } = useTranslation();
-  const retailerId = user.id === 3 ? 1 : 2;
-  const myProducts = products.filter(p => p.retailerId === retailerId);
+
+  const [inventoryData, setInventoryData] = useState([]);
+  const [loadingInv, setLoadingInv] = useState(true);
+
+  // Fetch this retailer's products from Supabase
+  useEffect(() => {
+    if (!user?.id) return;
+    (async () => {
+      const { data } = await supabase
+        .from('products')
+        .select('*')
+        .eq('retailer_id', user.id)
+        .order('created_at', { ascending: false });
+      setInventoryData(data || []);
+      setLoadingInv(false);
+    })();
+  }, [user?.id]);
+
 
   const TABS = [
     { id: 'stock', label: t('nav.inventory'), icon: <FiBox /> },
@@ -39,7 +55,6 @@ export default function Inventory() {
   ];
 
   const [activeTab, setActiveTab] = useState('stock');
-  const [inventoryData, setInventoryData] = useState(myProducts.map(p => ({ ...p })));
   const [editingId, setEditingId] = useState(null);
   const [editStock, setEditStock] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -118,12 +133,19 @@ export default function Inventory() {
     setEditStock(product.stock.toString());
   };
 
-  const handleSave = (productId) => {
-    setInventoryData(prev =>
-      prev.map(p => p.id === productId ? { ...p, stock: parseInt(editStock) } : p)
-    );
+  const handleSave = async (productId) => {
+    const newStock = parseInt(editStock, 10);
+    const { error } = await supabase
+      .from('products')
+      .update({ stock: newStock })
+      .eq('id', productId);
+    if (!error) {
+      setInventoryData(prev =>
+        prev.map(p => p.id === productId ? { ...p, stock: newStock } : p)
+      );
+    }
     setEditingId(null);
-    setToast('Stock updated successfully!');
+    setToast(error ? '❌ Failed to update stock' : '✅ Stock updated successfully!');
     setTimeout(() => setToast(null), 2000);
   };
 

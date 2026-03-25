@@ -16,21 +16,17 @@ export default function Login() {
   const { loginWithCredentials } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
-
-    setTimeout(() => {
-      const result = loginWithCredentials(email.trim(), password);
-      if (result.success) {
-        // Auto-redirect to the dashboard based on their registered role
-        navigate(`/${result.user.role}`);
-      } else {
-        setError(result.error);
-      }
-      setLoading(false);
-    }, 600);
+    const result = await loginWithCredentials(email.trim(), password);
+    if (result.success) {
+      navigate(`/${result.role}`);
+    } else {
+      setError(result.error);
+    }
+    setLoading(false);
   };
 
   return (
@@ -121,11 +117,7 @@ export default function Login() {
               </Link>
             </p>
 
-            {/* Demo credentials hint */}
-            <div className="demo-hint">
-              <span className="demo-badge">DEMO</span>
-              Use <strong>customer@shopsa.com</strong> / <strong>customer123</strong> (or retailer/admin)
-            </div>
+
           </form>
         </div>
       </div>

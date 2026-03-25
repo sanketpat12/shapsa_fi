@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 import {
   FiUser, FiShoppingBag, FiShield, FiMail, FiLock,
   FiArrowRight, FiArrowLeft, FiEye, FiEyeOff,
@@ -58,6 +59,7 @@ export default function Register() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
 
   const { register } = useAuth();
   const navigate = useNavigate();
@@ -90,32 +92,37 @@ export default function Register() {
     return null;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     const validationError = validate();
     if (validationError) { setError(validationError); return; }
 
     setLoading(true);
-    setTimeout(() => {
-      const userData = {
-        name: selectedRole.id === 'retailer' ? storeName.trim() : name.trim(),
-        email: email.trim(),
-        password,
-        role: selectedRole.id,
-        ...(selectedRole.id === 'retailer'
-          ? { storeName: storeName.trim(), ownerName: name.trim() }
-          : {}),
-      };
+    const userData = {
+      name: name.trim(),
+      email: email.trim(),
+      password,
+      role: selectedRole.id,
+      ...(selectedRole.id === 'retailer'
+        ? { storeName: storeName.trim(), ownerName: name.trim() }
+        : {}),
+    };
 
-      const result = register(userData);
-      if (result.success) {
+    const result = await register(userData);
+    if (result.success) {
+      // Check if Supabase auto-signed user in (email confirmation OFF)
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
         navigate(`/${selectedRole.id}`);
       } else {
-        setError(result.error);
+        setSuccessMsg('✅ Account created! Please check your email to confirm, then log in.');
+        setTimeout(() => navigate('/login'), 4000);
       }
-      setLoading(false);
-    }, 600);
+    } else {
+      setError(result.error);
+    }
+    setLoading(false);
   };
 
   const pwStrength = getPasswordStrength(password);
@@ -196,6 +203,11 @@ export default function Register() {
                 <div className="reg-error">
                   <FiAlertCircle style={{ marginRight: 6, verticalAlign: 'middle' }} />
                   {error}
+                </div>
+              )}
+              {successMsg && (
+                <div className="reg-error" style={{ background: 'var(--success-bg,#d1fae5)', color: 'var(--success,#065f46)', borderColor: 'var(--success,#065f46)' }}>
+                  ✅ {successMsg}
                 </div>
               )}
 
