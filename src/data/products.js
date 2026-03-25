@@ -10,7 +10,13 @@ const products = [
     retailerId: 1,
     rating: 4.8,
     reviews: 234,
-    badge: "Best Seller"
+    badge: "Best Seller",
+    // Sales history: last 6 months sales count
+    salesHistory: [30, 28, 35, 22, 40, 38],
+    // Last sold date (null = not sold recently)
+    lastSoldDate: "2026-03-20",
+    // Area-level demand data
+    areaDemand: { "Mumbai": 87, "Delhi": 65, "Bangalore": 91, "Hyderabad": 72, "Chennai": 55 }
   },
   {
     id: 2,
@@ -23,7 +29,10 @@ const products = [
     retailerId: 1,
     rating: 4.9,
     reviews: 567,
-    badge: "New Arrival"
+    badge: "New Arrival",
+    salesHistory: [50, 60, 55, 70, 80, 75],
+    lastSoldDate: "2026-03-24",
+    areaDemand: { "Mumbai": 95, "Delhi": 88, "Bangalore": 92, "Hyderabad": 78, "Chennai": 84 }
   },
   {
     id: 3,
@@ -36,7 +45,10 @@ const products = [
     retailerId: 2,
     rating: 4.7,
     reviews: 189,
-    badge: "Popular"
+    badge: "Popular",
+    salesHistory: [20, 18, 22, 19, 25, 21],
+    lastSoldDate: "2026-03-22",
+    areaDemand: { "Mumbai": 74, "Delhi": 68, "Bangalore": 82, "Hyderabad": 60, "Chennai": 55 }
   },
   {
     id: 4,
@@ -49,7 +61,10 @@ const products = [
     retailerId: 1,
     rating: 4.9,
     reviews: 412,
-    badge: "Premium"
+    badge: "Premium",
+    salesHistory: [12, 10, 14, 9, 11, 13],
+    lastSoldDate: "2026-03-18",
+    areaDemand: { "Mumbai": 82, "Delhi": 76, "Bangalore": 94, "Hyderabad": 70, "Chennai": 65 }
   },
   {
     id: 5,
@@ -62,7 +77,10 @@ const products = [
     retailerId: 2,
     rating: 4.6,
     reviews: 321,
-    badge: "Low Stock"
+    badge: "Low Stock",
+    salesHistory: [0, 0, 1, 0, 0, 1],
+    lastSoldDate: "2026-01-10",
+    areaDemand: { "Mumbai": 45, "Delhi": 38, "Bangalore": 52, "Hyderabad": 30, "Chennai": 28 }
   },
   {
     id: 6,
@@ -75,7 +93,10 @@ const products = [
     retailerId: 1,
     rating: 4.8,
     reviews: 156,
-    badge: null
+    badge: null,
+    salesHistory: [0, 0, 0, 0, 0, 0],
+    lastSoldDate: null,
+    areaDemand: { "Mumbai": 22, "Delhi": 18, "Bangalore": 30, "Hyderabad": 14, "Chennai": 10 }
   },
   {
     id: 7,
@@ -88,7 +109,10 @@ const products = [
     retailerId: 2,
     rating: 4.9,
     reviews: 723,
-    badge: "Hot"
+    badge: "Hot",
+    salesHistory: [40, 45, 50, 60, 55, 65],
+    lastSoldDate: "2026-03-24",
+    areaDemand: { "Mumbai": 90, "Delhi": 85, "Bangalore": 88, "Hyderabad": 79, "Chennai": 72 }
   },
   {
     id: 8,
@@ -101,7 +125,10 @@ const products = [
     retailerId: 1,
     rating: 4.5,
     reviews: 89,
-    badge: null
+    badge: null,
+    salesHistory: [0, 1, 0, 0, 1, 0],
+    lastSoldDate: "2026-01-05",
+    areaDemand: { "Mumbai": 35, "Delhi": 30, "Bangalore": 40, "Hyderabad": 22, "Chennai": 18 }
   },
   {
     id: 9,
@@ -114,7 +141,10 @@ const products = [
     retailerId: 2,
     rating: 4.7,
     reviews: 445,
-    badge: "Low Stock"
+    badge: "Low Stock",
+    salesHistory: [15, 12, 18, 14, 20, 16],
+    lastSoldDate: "2026-03-21",
+    areaDemand: { "Mumbai": 60, "Delhi": 55, "Bangalore": 70, "Hyderabad": 48, "Chennai": 42 }
   },
   {
     id: 10,
@@ -127,7 +157,10 @@ const products = [
     retailerId: 1,
     rating: 4.6,
     reviews: 178,
-    badge: null
+    badge: null,
+    salesHistory: [0, 0, 0, 1, 0, 0],
+    lastSoldDate: "2025-12-15",
+    areaDemand: { "Mumbai": 20, "Delhi": 15, "Bangalore": 25, "Hyderabad": 12, "Chennai": 8 }
   },
   {
     id: 11,
@@ -140,7 +173,10 @@ const products = [
     retailerId: 2,
     rating: 4.4,
     reviews: 234,
-    badge: "Value Pick"
+    badge: "Value Pick",
+    salesHistory: [25, 22, 28, 20, 30, 26],
+    lastSoldDate: "2026-03-23",
+    areaDemand: { "Mumbai": 78, "Delhi": 70, "Bangalore": 85, "Hyderabad": 65, "Chennai": 60 }
   },
   {
     id: 12,
@@ -153,12 +189,28 @@ const products = [
     retailerId: 1,
     rating: 4.9,
     reviews: 567,
-    badge: "Professional"
+    badge: "Professional",
+    salesHistory: [0, 0, 0, 0, 0, 0],
+    lastSoldDate: "2025-11-20",
+    areaDemand: { "Mumbai": 18, "Delhi": 14, "Bangalore": 22, "Hyderabad": 10, "Chennai": 8 }
   }
 ];
 
 export const categories = [
   "All", "Phones", "Laptops", "Audio", "Wearables", "Tablets", "Gaming", "Camera", "Smart Home", "Accessories"
 ];
+
+// AI Category Rules - used by AI category suggester in AddProduct
+export const categoryKeywords = {
+  "Phones": ["phone", "smartphone", "mobile", "iphone", "android", "5g", "sim", "lumia", "pixel", "galaxy", "oneplus"],
+  "Laptops": ["laptop", "notebook", "macbook", "ultrabook", "chromebook", "computer", "pc", "workstation", "macpro"],
+  "Audio": ["headphone", "earphone", "earbud", "speaker", "audio", "sound", "bass", "noise cancel", "wireless audio", "airpod", "buds"],
+  "Wearables": ["watch", "smartwatch", "band", "fitness", "wearable", "tracker", "heart rate", "fitband", "spo2"],
+  "Tablets": ["tablet", "ipad", "tab", "slate", "drawing pad", "e-reader", "kindle"],
+  "Gaming": ["gaming", "console", "game", "playstation", "xbox", "nintendo", "controller", "joystick", "gpu"],
+  "Camera": ["camera", "drone", "lens", "mirrorless", "dslr", "gopro", "4k video", "photography", "camcorder"],
+  "Smart Home": ["smart home", "smart speaker", "alexa", "google home", "bulb", "thermostat", "ring", "iot", "hub", "automation"],
+  "Accessories": ["charger", "powerbank", "cable", "case", "cover", "stand", "mount", "adapter", "hub", "dock", "bag", "power bank"]
+};
 
 export default products;

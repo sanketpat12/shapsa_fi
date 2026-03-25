@@ -1,204 +1,564 @@
-.inventory-page {
-  padding-top: 32px;
-  padding-bottom: 60px;
+/* ─── Inventory Page ─── */
+.inventory-page {}
+
+/* ─── TAB NAVIGATION ─── */
+.inv-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  padding: 4px;
+  background: var(--bg-secondary);
+  border-radius: 14px;
+  border: 1px solid var(--border);
 }
 
+.inv-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.inv-tab-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.inv-tab-btn.active {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+}
+
+/* ─── STATS ─── */
 .inventory-stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  margin-bottom: 24px;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
 }
 
 .inv-stat {
-  background: var(--bg-white);
-  border-radius: var(--radius-lg);
-  padding: 20px 24px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 14px;
   text-align: center;
-  border: 2px solid var(--border-light);
   cursor: pointer;
-  transition: var(--transition);
+  transition: all 0.2s;
 }
 
-.inv-stat:hover {
-  border-color: var(--primary);
-  box-shadow: var(--shadow-sm);
-}
+.inv-stat:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.inv-stat.healthy { border-color: var(--success); }
+.inv-stat.low { border-color: var(--warning); }
+.inv-stat.critical { border-color: var(--danger); }
+.inv-stat.deadstock { border-color: #8b5cf6; }
 
 .inv-stat-value {
   display: block;
-  font-size: 1.75rem;
+  font-size: 1.6rem;
   font-weight: 800;
-  color: var(--text-dark);
+  color: var(--text-primary);
 }
 
 .inv-stat-label {
-  font-size: 0.8rem;
+  display: block;
+  font-size: 0.72rem;
   color: var(--text-muted);
+  margin-top: 2px;
   font-weight: 500;
 }
 
-.inv-stat.healthy .inv-stat-value { color: var(--success); }
-.inv-stat.low .inv-stat-value { color: var(--warning); }
-.inv-stat.critical .inv-stat-value { color: var(--danger); }
-
+/* ─── FILTERS ─── */
 .inventory-controls {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
   gap: 16px;
-  margin-bottom: 24px;
   flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.category-filter-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 20px;
 }
 
 .filter-pills {
   display: flex;
-  gap: 8px;
-}
-
-.stock-cell {
-  min-width: 140px;
-}
-
-.stock-number {
-  font-weight: 600;
-  font-size: 0.85rem;
-  display: block;
-  margin-bottom: 6px;
-}
-
-.stock-bar {
-  width: 100%;
-  height: 6px;
-  background: var(--border-light);
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.stock-bar-fill {
-  height: 100%;
-  border-radius: 3px;
-  transition: width 0.5s ease;
-}
-
-.stock-edit-input {
-  width: 80px;
-  padding: 6px 10px;
-  border: 2px solid var(--primary);
-  border-radius: var(--radius-sm);
-  font-size: 0.9rem;
-  font-weight: 600;
-  text-align: center;
-}
-
-.critical-row {
-  background: rgba(239, 68, 68, 0.03) !important;
-}
-
-.critical-row:hover {
-  background: rgba(239, 68, 68, 0.06) !important;
-}
-
-/* search-box and search-input etc reused from Products.css */
-.inventory-page .search-box {
-  position: relative;
-}
-
-.inventory-page .search-icon {
-  position: absolute;
-  left: 14px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--text-muted);
-}
-
-.inventory-page .search-input {
-  width: 100%;
-  padding: 10px 16px 10px 42px;
-  border: 2px solid var(--border);
-  border-radius: var(--radius-full);
-  font-size: 0.9rem;
-  transition: var(--transition);
-  background: var(--bg-white);
-}
-
-.inventory-page .search-input:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
-}
-
-@media (max-width: 768px) {
-  .inventory-stats {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .inventory-controls {
-    flex-direction: column;
-    align-items: stretch;
-  }
-}
-
-/* ── Category Filter Row ── */
-.category-filter-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
-  margin-bottom: 28px;
-  padding: 12px 16px;
-  background: var(--bg-white);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-lg);
+  align-items: center;
 }
 
-/* ── Category Sections ── */
+.category-btn {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.18s;
+  white-space: nowrap;
+}
+
+.category-btn:hover { border-color: var(--primary); color: var(--primary); }
+.category-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+/* ─── CATEGORY SECTION ─── */
 .inventory-category-section {
-  margin-bottom: 20px;
-  border-radius: var(--radius-lg);
+  margin-bottom: 16px;
+  border-radius: 14px;
   overflow: hidden;
-  border: 1px solid var(--border-light);
-  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
 }
 
 .inventory-category-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  background: var(--bg-secondary);
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+}
+
+.inventory-category-header:hover { background: var(--bg-tertiary); }
+.category-header-emoji { font-size: 1.2rem; }
+.category-header-name { font-weight: 700; color: var(--text-primary); }
+.category-header-count {
+  background: var(--primary-muted);
+  color: var(--primary);
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* ─── STOCK CELLS ─── */
+.stock-cell { display: flex; flex-direction: column; gap: 4px; min-width: 120px; }
+.stock-number { font-weight: 600; font-size: 0.88rem; }
+.stock-edit-input {
+  width: 80px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--primary);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+.stock-bar { height: 5px; background: var(--bg-tertiary); border-radius: 3px; overflow: hidden; margin-top: 3px; }
+.stock-bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
+.critical-row { background: rgba(239,68,68,0.04); }
+
+/* ─── TAB SECTIONS ─── */
+.tab-section { animation: fadeInUp 0.3s ease; }
+
+.inv-section-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 20px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.inv-section-icon {
+  font-size: 2.2rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.inv-section-title {
+  font-size: 1.2rem;
+  font-weight: 800;
+  margin: 0 0 6px 0;
+  color: var(--text-primary);
+}
+
+.inv-section-desc {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.6;
+}
+
+.ai-badge-soon {
+  display: inline-block;
+  margin-left: 10px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  font-size: 0.72rem;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+/* ─── DEAD STOCK ─── */
+.dead-stock-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 20px;
+}
+
+.dead-stock-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.dead-stock-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+
+.dead-stock-img-wrap {
+  position: relative;
+  height: 160px;
+  background: var(--bg-tertiary);
+}
+
+.dead-stock-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.8;
+  filter: grayscale(30%);
+}
+
+.dead-stock-risk {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 0.72rem !important;
+}
+
+.dead-stock-info {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dead-stock-name {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.dead-stock-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.dead-meta-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.dead-meta-label { font-size: 0.72rem; color: var(--text-muted); }
+.dead-meta-val { font-size: 0.88rem; font-weight: 700; color: var(--text-primary); }
+
+.dead-stock-chart { display: flex; flex-direction: column; gap: 6px; }
+.dead-chart-label { font-size: 0.72rem; color: var(--text-muted); }
+
+.mini-bar-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 36px;
+}
+
+.mini-bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+}
+
+.mini-bar {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 3px 3px 0 0;
+  transition: height 0.4s;
+}
+
+.mini-bar-label { font-size: 0.62rem; color: var(--text-muted); }
+
+.dead-stock-actions { display: flex; gap: 8px; }
+
+/* ─── SELL WISE DEMAND ─── */
+.sellwise-list { display: flex; flex-direction: column; gap: 12px; }
+
+.sellwise-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  transition: all 0.2s;
+}
+
+.sellwise-row:hover { box-shadow: var(--shadow-md); transform: translateX(3px); }
+
+.sellwise-row.top-seller {
+  border-color: var(--primary);
+  background: linear-gradient(135deg, var(--bg-secondary), rgba(99,102,241,0.05));
+}
+
+.sellwise-rank { font-size: 1.3rem; min-width: 36px; text-align: center; }
+.rank-num { font-size: 0.9rem; color: var(--text-muted); font-weight: 700; }
+
+.sellwise-img { width: 52px; height: 52px; border-radius: 10px; object-fit: cover; flex-shrink: 0; }
+
+.sellwise-info { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+
+.sellwise-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sellwise-name { font-weight: 700; font-size: 0.95rem; color: var(--text-primary); }
+
+.sellwise-bar-wrap { display: flex; align-items: center; gap: 10px; }
+
+.sellwise-bar {
+  flex: 1;
+  height: 8px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.sellwise-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), #8b5cf6);
+  border-radius: 4px;
+  transition: width 0.6s ease;
+}
+
+.sellwise-bar-label { font-size: 0.78rem; color: var(--text-muted); white-space: nowrap; font-weight: 600; }
+
+.sellwise-months {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.month-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
+.month-val { font-size: 0.8rem; font-weight: 700; color: var(--text-primary); }
+.month-name { font-size: 0.62rem; color: var(--text-muted); }
+
+.sellwise-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 90px;
+  text-align: center;
+}
+
+.sellwise-trend { font-size: 1rem; font-weight: 800; }
+.sellwise-meta-label { font-size: 0.65rem; color: var(--text-muted); }
+.sellwise-stock { font-size: 0.82rem; font-weight: 600; }
+
+/* ─── POPULAR IN AREA ─── */
+.area-selector {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.area-btn {
+  padding: 8px 18px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+
+.area-btn:hover { border-color: var(--primary); color: var(--primary); }
+.area-btn.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+  box-shadow: 0 4px 12px rgba(99,102,241,0.3);
+}
+
+.area-heatmap-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: 100%;
-  padding: 14px 20px;
-  background: linear-gradient(135deg, rgba(255, 107, 53, 0.06), rgba(255, 107, 53, 0.02));
-  border: none;
-  cursor: pointer;
-  transition: background 0.2s;
-  border-bottom: 1px solid var(--border-light);
+  padding: 10px 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.inventory-category-header:hover {
-  background: linear-gradient(135deg, rgba(255, 107, 53, 0.1), rgba(255, 107, 53, 0.04));
+.area-heatmap-title { font-size: 0.88rem; color: var(--text-primary); }
+.area-heatmap-legend { display: flex; gap: 16px; font-size: 0.78rem; }
+
+.popular-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
 }
 
-.category-header-emoji {
-  font-size: 1.3rem;
+.popular-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  position: relative;
+  transition: all 0.2s;
 }
 
-.category-header-name {
-  font-size: 1rem;
+.popular-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+
+.popular-rank-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  font-size: 0.72rem;
   font-weight: 700;
-  color: var(--text-dark);
+  padding: 3px 8px;
+  border-radius: 20px;
+  z-index: 1;
 }
 
-.category-header-count {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  background: var(--border-light);
-  padding: 2px 10px;
-  border-radius: 99px;
-  font-weight: 500;
+.popular-img {
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
+  display: block;
 }
 
-.inventory-category-section .table-container {
-  border-radius: 0;
-  box-shadow: none;
-  border: none;
+.popular-info {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
+.popular-name { font-size: 0.92rem; font-weight: 700; margin: 0; color: var(--text-primary); }
+
+.popular-demand-bar {
+  height: 7px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 4px 0;
+}
+
+.popular-demand-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.6s ease;
+}
+
+.popular-demand-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.popular-demand-val { font-size: 0.88rem; font-weight: 700; }
+
+.popular-area-mini {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin: 6px 0;
+}
+
+.area-mini-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: var(--bg-tertiary);
+  border: 1px solid transparent;
+  font-size: 0.65rem;
+  transition: all 0.15s;
+}
+
+.area-mini-chip.selected-area {
+  border-color: var(--primary);
+  background: var(--primary-muted);
+}
+
+.area-mini-name { color: var(--text-muted); }
+.area-mini-val { font-weight: 700; }
+
+.popular-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 768px) {
+  .inventory-stats { grid-template-columns: repeat(3, 1fr); }
+  .inv-tabs { gap: 4px; }
+  .inv-tab-btn { padding: 8px 12px; font-size: 0.78rem; }
+  .sellwise-row { flex-wrap: wrap; }
+  .sellwise-months { display: none; }
+}
+
+@media (max-width: 480px) {
+  .inventory-stats { grid-template-columns: 1fr 1fr; }
+  .dead-stock-grid { grid-template-columns: 1fr; }
+  .popular-grid { grid-template-columns: 1fr; }
+}
