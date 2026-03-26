@@ -1,25 +1,64 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import orders from '../../data/orders';
+import { supabase } from '../../lib/supabase';
 
 export default function RetailerOrders() {
   const { user } = useAuth();
-  const retailerId = user.id === 3 ? 1 : 2;
-  const myOrders = orders.filter(o => o.retailerId === retailerId);
+  const [myOrders, setMyOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('All');
+
+  useEffect(() => {
+    const fetchOrders = async () => {
+      if (!user) return;
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          total_price,
+          status,
+          created_at,
+          items,
+          customer_id,
+          profiles:customer_id (name, email)
+        `)
+        .eq('retailer_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        setMyOrders(data);
+      }
+      setLoading(false);
+    };
+
+    fetchOrders();
+  }, [user]);
+
+  const updateOrderStatus = async (orderId, newStatus) => {
+    const { error } = await supabase
+      .from('orders')
+      .update({ status: newStatus })
+      .eq('id', orderId);
+
+    if (!error) {
+      setMyOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+    } else {
+      alert("Failed to update status.");
+    }
+  };
 
   const filteredOrders = statusFilter === 'All'
     ? myOrders
     : myOrders.filter(o => o.status === statusFilter);
 
-  const statuses = ['All', 'Pending', 'Processing', 'Shipped', 'Delivered'];
+  const statuses = ['All', 'Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'];
 
   return (
     <div className="page-container animate-fade-in" style={{ paddingTop: 32, paddingBottom: 60 }}>
       <div className="page-header">
         <div>
-          <h1 className="page-title">Orders</h1>
-          <p className="page-subtitle">{myOrders.length} total orders</p>
+          <h1 className="page-title">Orders Dashboard</h1>
+          <p className="page-subtitle">{loading ? 'Loading...' : `${myOrders.length} total orders`}</p>
         </div>
       </div>
 
@@ -59,7 +98,13 @@ export default function RetailerOrders() {
             </tr>
           </thead>
           <tbody>
-            {filteredOrders.length === 0 ? (
+            {loading ? (
+              <tr>
+                <td colSpan={6} style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
+                  Loading orders...
+                </td>
+              </tr>
+            ) : filteredOrders.length === 0 ? (
               <tr>
                 <td colSpan={6} style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
                   No orders with status "{statusFilter}"
@@ -68,8 +113,8 @@ export default function RetailerOrders() {
             ) : (
               filteredOrders.map(order => (
                 <tr key={order.id}>
-                  <td style={{ fontWeight: 700 }}>{order.id}</td>
-                  <td>{order.customerName}</td>
+                  <td style={{ fontWeight: 700, fontSize: '0.8rem', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={order.id}>{order.id}</td>
+                  <td>{order.profiles?.name || order.profiles?.email || 'Unknown Customer'}</td>
                   <td>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       {order.items.map((item, i) => (
@@ -80,14 +125,26 @@ export default function RetailerOrders() {
                       ))}
                     </div>
                   </td>
-                  <td style={{ fontWeight: 700 }}>${order.total}</td>
+                  <td style={{ fontWeight: 700 }}>₹{order.total_price}</td>
                   <td>
-                    <span className={`status-pill ${order.status.toLowerCase()}`}>
-                      <span className="status-dot"></span>
-                      {order.status}
-                    </span>
+                    {order.status === 'Cancelled' ? (
+                      <span className="status-pill cancelled">
+                        <span className="status-dot"></span> Cancelled
+                      </span>
+                    ) : (
+                      <select 
+                        value={order.status}
+                        onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                        style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-white)', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}
+                      >
+                        <option value="Pending">Pending</option>
+                        <option value="Processing">Processing</option>
+                        <option value="Shipped">Shipped</option>
+                        <option value="Delivered">Delivered</option>
+                      </select>
+                    )}
                   </td>
-                  <td style={{ color: 'var(--text-muted)' }}>{order.date}</td>
+                  <td style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{new Date(order.created_at).toLocaleDateString()}</td>
                 </tr>
               ))
             )}

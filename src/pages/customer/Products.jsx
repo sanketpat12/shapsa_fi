@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { FiSearch, FiShoppingCart, FiStar, FiFilter } from 'react-icons/fi';
+import { FiSearch, FiShoppingCart, FiStar, FiFilter, FiX, FiCheckCircle } from 'react-icons/fi';
 import './Products.css';
 
 const CATEGORIES = ['All', 'Phones', 'Laptops', 'Audio', 'Wearables', 'Tablets', 'Gaming', 'Camera', 'Smart Home', 'Accessories', 'Food', 'Snacks', 'Handcraft', 'Groceries', 'Clothing'];
@@ -14,9 +14,16 @@ export default function Products() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('featured');
   const [toast, setToast] = useState(null);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+
+  const MOCK_REVIEWS = [
+    { id: 1, user: "Alex M.", rating: 5, text: "Absolutely love this product! Highly recommended.", date: "2 days ago" },
+    { id: 2, user: "Sarah J.", rating: 4, text: "Good quality, but shipping took a little longer than expected.", date: "1 week ago" },
+    { id: 3, user: "Michael T.", rating: 5, text: "Exceeded my expectations. Great value for the price.", date: "2 weeks ago" }
+  ];
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { addToCart } = useAuth();
+  const { user, addToCart } = useAuth();
 
   // Fetch products from Supabase whenever category changes
   useEffect(() => {
@@ -59,10 +66,56 @@ export default function Products() {
     return filtered;
   })();
 
-  const handleAddToCart = (product) => {
+  const handleAddToCart = (product, e) => {
+    if (e) e.stopPropagation();
     addToCart(product);
     setToast(`${product.name} added to cart!`);
     setTimeout(() => setToast(null), 2000);
+  };
+
+  const handleBuyNow = async (product, e) => {
+    if (e) e.stopPropagation();
+    if (!user) return alert('Please log in to purchase');
+    
+    const subtotal = product.price; 
+    const totalWithTax = subtotal * 1.08;
+
+    let finalRetailerId = product.retailer_id;
+    
+    // Fallback for mock/dummy products: find a real retailer who has added products
+    if (!finalRetailerId || finalRetailerId.toString().length < 20) {
+      const { data: realProds } = await supabase.from('products').select('retailer_id').not('retailer_id', 'is', null).neq('retailer_id', 1).neq('retailer_id', 2).limit(1);
+      if (realProds && realProds.length > 0 && realProds[0].retailer_id.length > 20) {
+        finalRetailerId = realProds[0].retailer_id;
+      } else {
+        return alert("Demo Mode Checkout Failed: No real Retailer accounts found. Please log in as a Retailer, add a new product, and try buying that one!");
+      }
+    }
+
+    const orderToInsert = {
+      customer_id: user.id,
+      retailer_id: finalRetailerId,
+      items: [{
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        quantity: 1,
+        image: product.image
+      }],
+      total_price: Number(totalWithTax.toFixed(2)),
+      status: 'Pending'
+    };
+
+    const { error } = await supabase.from('orders').insert([orderToInsert]);
+    
+    if (error) {
+      console.error('Buy Now error:', error);
+      alert('Failed to place order: ' + error.message);
+    } else {
+      setToast(`Order placed successfully!`);
+      setTimeout(() => setToast(null), 3000);
+      setSelectedProduct(null); // Close modal
+    }
   };
 
   return (
@@ -123,7 +176,8 @@ export default function Products() {
             <div
               key={product.id}
               className="product-card"
-              style={{ animationDelay: `${i * 0.05}s` }}
+              style={{ animationDelay: `${i * 0.05}s`, cursor: 'pointer' }}
+              onClick={() => setSelectedProduct(product)}
             >
               {product.badge && <span className="product-badge">{product.badge}</span>}
               <div className="product-img-container">
@@ -139,7 +193,7 @@ export default function Products() {
                 )}
                 <button
                   className="quick-add-btn"
-                  onClick={() => handleAddToCart(product)}
+                  onClick={(e) => handleAddToCart(product, e)}
                   title="Add to Cart"
                 >
                   <FiShoppingCart />
@@ -152,20 +206,117 @@ export default function Products() {
                   {product.description ? product.description.substring(0, 60) + '…' : ''}
                 </p>
                 <div className="product-meta">
-                  <span className="product-price">${product.price}</span>
+                  <span className="product-price">₹{product.price}</span>
                   <span className="product-rating">
                     <FiStar className="star-filled" /> {product.rating || '—'}
                   </span>
                 </div>
                 <button
                   className="btn btn-primary btn-sm add-cart-btn"
-                  onClick={() => handleAddToCart(product)}
+                  onClick={(e) => handleAddToCart(product, e)}
                 >
                   <FiShoppingCart /> Add to Cart
                 </button>
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {selectedProduct && (
+        <div className="modal-overlay" onClick={() => setSelectedProduct(null)} style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+          backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', 
+          alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 24,
+          backdropFilter: 'blur(4px)'
+        }}>
+          <div className="modal-content animate-fade-in-up" onClick={e => e.stopPropagation()} style={{
+            background: 'var(--bg-white)', borderRadius: '24px', 
+            maxWidth: 900, width: '100%', maxHeight: '90vh', overflowY: 'auto',
+            position: 'relative', display: 'flex', flexDirection: 'row', boxShadow: '0 24px 48px rgba(0,0,0,0.2)'
+          }}>
+            <button onClick={() => setSelectedProduct(null)} style={{
+              position: 'absolute', top: 20, right: 20, background: 'var(--bg-secondary)', 
+              border: 'none', width: 40, height: 40, borderRadius: '50%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', zIndex: 10, transition: 'all 0.2s', color: 'var(--text-dark)'
+            }}
+            onMouseOver={e => e.currentTarget.style.background = 'var(--border)'}
+            onMouseOut={e => e.currentTarget.style.background = 'var(--bg-secondary)'}
+            >
+              <FiX size={24} />
+            </button>
+            
+            <div className="modal-image-col" style={{ flex: '1 1 40%', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+              {selectedProduct.image ? (
+                <img src={selectedProduct.image} alt={selectedProduct.name} style={{
+                  width: '100%', height: 'auto', maxHeight: '60vh', objectFit: 'contain', 
+                  borderRadius: '12px', mixBlendMode: 'darken'
+                }} />
+              ) : (
+                <div style={{ fontSize: 100 }}>📦</div>
+              )}
+            </div>
+
+            <div className="modal-info-col" style={{ flex: '1 1 60%', padding: '40px', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ marginBottom: 24 }}>
+                <span className="product-category" style={{ display: 'inline-block', marginBottom: 12, padding: '4px 12px', background: 'var(--accent-light)', color: 'var(--primary)', borderRadius: 20, fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  {selectedProduct.category}
+                </span>
+                <h2 style={{ fontSize: '2.5rem', margin: '0 0 12px 0', color: 'var(--text-dark)', lineHeight: 1.1, fontWeight: 800 }}>{selectedProduct.name}</h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+                  <span style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--primary)' }}>₹{selectedProduct.price}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f59e0b', fontWeight: 600, fontSize: '1.1rem' }}>
+                    <FiStar className="star-filled" /> {selectedProduct.rating || '4.8'} <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 500 }}>(124 reviews)</span>
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '24px 0', borderTop: '1px solid var(--border-light)', borderBottom: '1px solid var(--border-light)' }}>
+                <p style={{ color: 'var(--text-body)', lineHeight: 1.7, fontSize: '1.05rem', margin: 0 }}>{selectedProduct.description || 'No description available for this product. High quality materials and exceptional design make this a perfect choice.'}</p>
+                
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <li style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--text-dark)', fontWeight: 500 }}><FiCheckCircle color="var(--success)" size={20} /> <span style={{ color: 'var(--success)' }}>In stock and ready to ship</span></li>
+                  <li style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--text-body)' }}><FiCheckCircle color="var(--primary)" size={20} /> Free shipping on orders over ₹500</li>
+                </ul>
+              </div>
+
+              <div style={{ padding: '24px 0', flex: 1 }}>
+                <h3 style={{ fontSize: '1.3rem', margin: '0 0 20px 0', fontWeight: 700 }}>Customer Reviews</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {MOCK_REVIEWS.slice(0,2).map(review => (
+                    <div key={review.id} style={{ background: 'var(--bg-secondary)', padding: 20, borderRadius: '12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <span style={{ fontWeight: 700, color: 'var(--text-dark)' }}>{review.user}</span>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{review.date}</span>
+                      </div>
+                      <div style={{ color: '#f59e0b', marginBottom: 10, display: 'flex', gap: 2 }}>
+                        {[...Array(5)].map((_, i) => <FiStar key={i} fill={i < review.rating ? 'currentColor' : 'none'} color={i < review.rating ? 'currentColor' : 'var(--border)'} size={14} />)}
+                      </div>
+                      <p style={{ fontSize: '0.95rem', color: 'var(--text-body)', margin: 0, lineHeight: 1.5 }}>"{review.text}"</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 16, marginTop: 'auto', paddingTop: 20 }}>
+                <button 
+                  className="btn btn-secondary btn-lg" 
+                  style={{ flex: 1, padding: '16px', fontSize: '1.1rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, background: 'var(--accent-light)', color: 'var(--primary)', border: 'none' }}
+                  onClick={(e) => handleAddToCart(selectedProduct, e)}
+                >
+                  <FiShoppingCart /> Add to Cart
+                </button>
+                <button 
+                  className="btn btn-primary btn-lg" 
+                  style={{ flex: 1, padding: '16px', fontSize: '1.1rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8 }}
+                  onClick={(e) => handleBuyNow(selectedProduct, e)}
+                >
+                  Buy Now
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

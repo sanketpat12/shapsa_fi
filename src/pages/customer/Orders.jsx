@@ -1,10 +1,46 @@
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import orders from '../../data/orders';
-import { FiPackage, FiTruck, FiCheckCircle, FiClock } from 'react-icons/fi';
+import { supabase } from '../../lib/supabase';
+import { FiPackage, FiTruck, FiCheckCircle, FiClock, FiXCircle } from 'react-icons/fi';
 
 export default function Orders() {
   const { user } = useAuth();
-  const userOrders = orders.filter(o => o.customerId === user.id);
+  const [userOrders, setUserOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchOrders = async () => {
+      if (!user) return;
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('customer_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        setUserOrders(data);
+      }
+      setLoading(false);
+    };
+
+    fetchOrders();
+  }, [user]);
+
+  const handleCancelOrder = async (orderId) => {
+    if (!window.confirm("Are you sure you want to cancel this order?")) return;
+
+    const { error } = await supabase
+      .from('orders')
+      .update({ status: 'Cancelled' })
+      .eq('id', orderId)
+      .eq('status', 'Pending'); // Ensure only pending can be cancelled
+
+    if (!error) {
+      setUserOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'Cancelled' } : o));
+    } else {
+      alert("Could not cancel order.");
+    }
+  };
 
   const getStatusIcon = (status) => {
     switch (status) {
@@ -24,7 +60,9 @@ export default function Orders() {
         </div>
       </div>
 
-      {userOrders.length === 0 ? (
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>Loading orders...</div>
+      ) : userOrders.length === 0 ? (
         <div className="empty-state">
           <div className="empty-icon">📦</div>
           <h3>No orders yet</h3>
@@ -42,17 +80,27 @@ export default function Orders() {
                   </div>
                   <div>
                     <span style={{ color: 'var(--text-muted)' }}>Date</span>
-                    <p style={{ fontWeight: 600, color: 'var(--text-dark)' }}>{order.date}</p>
+                    <p style={{ fontWeight: 600, color: 'var(--text-dark)' }}>{new Date(order.created_at).toLocaleDateString()}</p>
                   </div>
                   <div>
                     <span style={{ color: 'var(--text-muted)' }}>Total</span>
-                    <p style={{ fontWeight: 700, color: 'var(--text-dark)' }}>${order.total}</p>
+                    <p style={{ fontWeight: 700, color: 'var(--text-dark)' }}>₹{order.total_price}</p>
                   </div>
                 </div>
-                <span className={`status-pill ${order.status.toLowerCase()}`}>
-                  <span className="status-dot"></span>
-                  {order.status}
-                </span>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                  {order.status === 'Pending' && (
+                    <button 
+                      onClick={() => handleCancelOrder(order.id)}
+                      style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}
+                    >
+                      <FiXCircle /> Cancel Order
+                    </button>
+                  )}
+                  <span className={`status-pill ${order.status.toLowerCase()}`}>
+                    <span className="status-dot"></span>
+                    {order.status}
+                  </span>
+                </div>
               </div>
               <div style={{ padding: 24 }}>
                 {order.items.map((item, i) => (
@@ -66,7 +114,7 @@ export default function Orders() {
                       <p style={{ fontWeight: 600, color: 'var(--text-dark)' }}>{item.name}</p>
                       <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Qty: {item.quantity}</p>
                     </div>
-                    <p style={{ fontWeight: 700 }}>${item.price * item.quantity}</p>
+                    <p style={{ fontWeight: 700 }}>₹{(item.price * item.quantity).toFixed(2)}</p>
                   </div>
                 ))}
               </div>

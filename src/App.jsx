@@ -1,4 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { supabase } from './lib/supabase';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 import Navbar from './components/Navbar';
@@ -27,10 +29,45 @@ import SiteSettings from './pages/admin/SiteSettings';
 
 function AppRoutes() {
   const { user } = useAuth();
+  const [newOrderToast, setNewOrderToast] = useState(null);
+
+  useEffect(() => {
+    if (!user || user.role !== 'retailer') return;
+
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'orders',
+          filter: `retailer_id=eq.${user.id}`,
+        },
+        (payload) => {
+          setNewOrderToast(`🎉 New order received for ₹${payload.new.total_price}!`);
+          setTimeout(() => setNewOrderToast(null), 5000);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   return (
     <>
       {user && <Navbar />}
+      {newOrderToast && (
+        <div style={{
+          position: 'fixed', top: 80, right: 20, background: 'var(--success)', color: 'white',
+          padding: '16px 24px', borderRadius: 8, boxShadow: '0 8px 16px rgba(0,0,0,0.15)',
+          zIndex: 9999, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 12
+        }}>
+          {newOrderToast}
+        </div>
+      )}
       <Routes>
         <Route path="/login" element={user ? <Navigate to={`/${user.role}`} /> : <Login />} />
         <Route path="/register" element={user ? <Navigate to={`/${user.role}`} /> : <Register />} />

@@ -58,7 +58,7 @@ export default function CustomerDashboard() {
             </div>
             <div className="floating-card-info">
               <span className="floating-card-name">ProAudio X1</span>
-              <span className="floating-card-price">$299</span>
+              <span className="floating-card-price">₹299</span>
             </div>
           </div>
 
@@ -68,7 +68,7 @@ export default function CustomerDashboard() {
             </div>
             <div className="floating-card-info">
               <span className="floating-card-name">Lumina Phone 15</span>
-              <span className="floating-card-price">$999</span>
+              <span className="floating-card-price">₹999</span>
             </div>
           </div>
 
@@ -78,7 +78,7 @@ export default function CustomerDashboard() {
             </div>
             <div className="floating-card-info">
               <span className="floating-card-name">SmartWatch Pro</span>
-              <span className="floating-card-price">$449</span>
+              <span className="floating-card-price">₹449</span>
             </div>
           </div>
         </div>
@@ -114,7 +114,7 @@ export default function CustomerDashboard() {
           <div className="feature-card">
             <div className="feature-icon"><FiTruck /></div>
             <h3>Free Shipping</h3>
-            <p>On orders over $50</p>
+            <p>On orders over ₹500</p>
           </div>
           <div className="feature-card">
             <div className="feature-icon"><FiStar /></div>
