@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { FiPackage, FiTruck, FiCheckCircle, FiClock, FiXCircle } from 'react-icons/fi';
+import { FiPackage, FiTruck, FiCheckCircle, FiClock, FiXCircle, FiTrash2 } from 'react-icons/fi';
 
 export default function Orders() {
   const { user } = useAuth();
@@ -29,19 +29,16 @@ export default function Orders() {
   const handleCancelOrder = async (orderId) => {
     if (!window.confirm("Are you sure you want to cancel this order? Stock will be restored.")) return;
 
-    // Get the order items first (so we can restore stock)
     const orderToCancel = userOrders.find(o => o.id === orderId);
     if (!orderToCancel) return;
 
-    // Try direct update first
     const { error } = await supabase
       .from('orders')
       .update({ status: 'Cancelled' })
       .eq('id', orderId)
-      .eq('customer_id', user.id); // RLS already restricts Pending-only
+      .eq('customer_id', user.id);
 
     if (!error) {
-      // Restore stock for each item
       if (orderToCancel.items) {
         for (const item of orderToCancel.items) {
           if (item.id) {
@@ -55,7 +52,6 @@ export default function Orders() {
       setUserOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'Cancelled' } : o));
     } else {
       console.error('Cancel order error:', error);
-      // Fallback: use the cancel_order RPC which bypasses RLS
       const { error: rpcError } = await supabase.rpc('cancel_order', {
         order_id: orderId,
         cust_id: user.id
@@ -73,6 +69,23 @@ export default function Orders() {
         console.error('Cancel RPC error:', rpcError);
         alert("Could not cancel order: " + rpcError.message);
       }
+    }
+  };
+
+  const handleClearOrder = async (orderId) => {
+    if (!window.confirm("Remove this cancelled order from your history completely?")) return;
+
+    const { error } = await supabase
+      .from('orders')
+      .delete()
+      .eq('id', orderId)
+      .eq('customer_id', user.id);
+
+    if (error) {
+      console.error('Clear order error:', error);
+      alert('Could not clear order: ' + error.message);
+    } else {
+      setUserOrders(prev => prev.filter(o => o.id !== orderId));
     }
   };
 
@@ -128,6 +141,16 @@ export default function Orders() {
                       style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}
                     >
                       <FiXCircle /> Cancel Order
+                    </button>
+                  )}
+                  {order.status === 'Cancelled' && (
+                    <button 
+                      onClick={() => handleClearOrder(order.id)}
+                      style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: '12px', transition: 'all 0.2s' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--danger)'; e.currentTarget.style.color = 'white'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'; e.currentTarget.style.color = 'var(--danger)'; }}
+                    >
+                      <FiTrash2 size={14} /> Clear
                     </button>
                   )}
                   <span className={`status-pill ${order.status.toLowerCase()}`}>

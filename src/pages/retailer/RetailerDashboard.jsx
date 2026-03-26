@@ -13,6 +13,7 @@ export default function RetailerDashboard() {
   const [myProducts, setMyProducts] = useState([]);
   const [myOrders, setMyOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [revenueFilter, setRevenueFilter] = useState('all');
 
   useEffect(() => {
     if (!user) return;
@@ -60,7 +61,22 @@ export default function RetailerDashboard() {
   }, [user]);
 
   const lowStockProducts = myProducts.filter(p => p.stock <= 10);
-  const totalRevenue = myOrders.reduce((sum, o) => sum + (Number(o.total_price) || 0), 0);
+  
+  const getFilteredRevenue = () => {
+    const now = new Date();
+    return myOrders
+      .filter(o => o.status !== 'Cancelled')
+      .filter(o => {
+        if (revenueFilter === 'all') return true;
+        const diffDays = (now - new Date(o.created_at)) / (1000 * 60 * 60 * 24);
+        if (revenueFilter === 'today') return diffDays <= 1;
+        if (revenueFilter === 'week') return diffDays <= 7;
+        if (revenueFilter === 'month') return diffDays <= 30;
+        return true;
+      })
+      .reduce((sum, o) => sum + (Number(o.total_price) || 0), 0);
+  };
+  const filteredRevenue = getFilteredRevenue();
 
   return (
     <div className="retailer-dashboard page-container animate-fade-in">
@@ -90,19 +106,31 @@ export default function RetailerDashboard() {
           <div className="stat-value">{myOrders.length}</div>
           <div className="stat-label">{t('nav.orders')}</div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card" style={{ position: 'relative' }}>
           <div className="stat-icon" style={{ background: 'var(--success-bg)', color: 'var(--success)' }}>
             <FiDollarSign />
           </div>
-          <div className="stat-value">₹{totalRevenue.toLocaleString()}</div>
-          <div className="stat-label">{t('dashboard.revenue')}</div>
+          <div className="stat-value" style={{ marginTop: 12 }}>₹{filteredRevenue.toLocaleString()}</div>
+          <div className="stat-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+            <span>{t('dashboard.revenue')}</span>
+            <select 
+              value={revenueFilter} 
+              onChange={e => setRevenueFilter(e.target.value)}
+              style={{ fontSize: '0.75rem', padding: '2px 4px', borderRadius: 4, background: 'var(--bg-white)', border: '1px solid var(--border)', cursor: 'pointer', maxWidth: 80 }}
+            >
+              <option value="all">All Time</option>
+              <option value="today">24 Hours</option>
+              <option value="week">7 Days</option>
+              <option value="month">30 Days</option>
+            </select>
+          </div>
         </div>
         <div className="stat-card">
           <div className="stat-icon" style={{ background: lowStockProducts.length > 0 ? 'var(--danger-bg)' : 'var(--success-bg)', color: lowStockProducts.length > 0 ? 'var(--danger)' : 'var(--success)' }}>
             <FiAlertTriangle />
           </div>
-          <div className="stat-value">{lowStockProducts.length}</div>
-          <div className="stat-label">Low Stock Alerts</div>
+          <div className="stat-value" style={{ marginTop: 12 }}>{lowStockProducts.length}</div>
+          <div className="stat-label" style={{ marginTop: 8 }}>Low Stock Alerts</div>
         </div>
       </div>
 

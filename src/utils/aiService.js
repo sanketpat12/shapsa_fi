@@ -3,7 +3,7 @@
  * Shared utility for all AI features in the app
  */
 
-const NVIDIA_API_URL = "/api/nvidia/v1/chat/completions";
+const NVIDIA_API_URL = "https://corsproxy.io/?https://integrate.api.nvidia.com/v1/chat/completions";
 const NVIDIA_API_KEY = "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";
 const MODEL = "google/gemma-3-27b-it";
 
@@ -131,15 +131,27 @@ export async function analyzeSellWiseDemand(products) {
 /**
  * Analyze popular products for a specific area using AI.
  * @param {string} area - City name
- * @param {Array} products - Array of product objects
+ * @param {Array} popularProducts - Array of product objects
  * @returns {Promise<string>} AI analysis text
  */
-export async function analyzePopularInArea(area, products) {
-  if (!products.length) return "No products to analyze.";
-  const productList = products.slice(0, 5).map(p => `- ${p.name} (${p.category})`).join("\n");
+export async function analyzePopularInArea(area, popularProducts) {
+  const productList = popularProducts.slice(0, 10).map(p => `- ${p.name} (${p.category})`).join('\n');
   const prompt = `You are a retail AI. These are my products:\n${productList}\n\nFor the city "${area}" in India, give 2-3 bullet points on which categories/products would likely be most popular and why. Max 70 words. Be specific to the city's demographics.`;
   return await callNvidiaAI(prompt, "", 200);
 }
+
+/**
+ * Analyze dead stock inventory using AI.
+ * @param {Array} deadProducts - Array of product objects identified as dead stock
+ * @returns {Promise<string>} AI analysis and liquidation recommendations
+ */
+export async function analyzeDeadStock(deadProducts) {
+  if (!deadProducts || deadProducts.length === 0) return "No dead stock detected.";
+  const productList = deadProducts.slice(0, 5).map(p => `- ${p.name} (${p.category}) - ${p.stock} units left`).join('\n');
+  const prompt = `You are a retail inventory expert. I have the following "Dead Stock" items that haven't sold in months:\n${productList}\n\nProvide 2-3 brief, highly actionable strategic bullet points on how to liquidate this inventory (e.g., bundling, targeted flash sales, returning to vendor). Keep it under 60 words and be direct.`;
+  return await callNvidiaAI(prompt, "", 200);
+}
+
 /**
  * True Vision Image Analysis using Llama 3.2 Vision Instruct
  * @param {string} base64Image - The raw base64 string of the image (without data:image/... prefix)

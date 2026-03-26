@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { FiTrash2 } from 'react-icons/fi';
 
 export default function RetailerOrders() {
   const { user } = useAuth();
@@ -63,6 +64,23 @@ export default function RetailerOrders() {
       setMyOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
     } else {
       alert("Failed to update status.");
+    }
+  };
+
+  const handleClearOrder = async (orderId) => {
+    if (!window.confirm("Remove this cancelled order from your history completely?")) return;
+
+    const { error } = await supabase
+      .from('orders')
+      .delete()
+      .eq('id', orderId)
+      .eq('retailer_id', user.id);
+
+    if (error) {
+      console.error('Clear order error:', error);
+      alert('Could not clear order: ' + error.message);
+    } else {
+      setMyOrders(prev => prev.filter(o => o.id !== orderId));
     }
   };
 
@@ -147,9 +165,20 @@ export default function RetailerOrders() {
                   <td style={{ fontWeight: 700 }}>₹{order.total_price}</td>
                   <td>
                     {order.status === 'Cancelled' ? (
-                      <span className="status-pill cancelled">
-                        <span className="status-dot"></span> Cancelled
-                      </span>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <span className="status-pill cancelled">
+                          <span className="status-dot"></span> Cancelled
+                        </span>
+                        <button 
+                          onClick={() => handleClearOrder(order.id)}
+                          style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', borderRadius: '8px', transition: 'all 0.2s' }}
+                          title="Clear from history"
+                          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--danger)'; e.currentTarget.style.color = 'white'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'; e.currentTarget.style.color = 'var(--danger)'; }}
+                        >
+                          <FiTrash2 size={14} /> Clear
+                        </button>
+                      </div>
                     ) : (
                       <select 
                         value={order.status}

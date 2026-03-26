@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { analyzeSellWiseDemand, analyzePopularInArea } from '../../utils/aiService';
+import { analyzeSellWiseDemand, analyzePopularInArea, analyzeDeadStock } from '../../utils/aiService';
 import {
   FiAlertTriangle, FiEdit2, FiCheck, FiX, FiSearch,
   FiChevronDown, FiChevronUp, FiPackage, FiTrendingUp,
@@ -10,7 +10,16 @@ import {
 import { useTranslation } from 'react-i18next';
 import './Inventory.css';
 
-const MONTHS = ['Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
+const getDynamicMonths = () => {
+  const labels = [];
+  const now = new Date();
+  for (let i = 5; i >= 0; i--) {
+     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+     labels.push(d.toLocaleString('default', { month: 'short' }));
+  }
+  return labels;
+};
+const MONTHS = getDynamicMonths();
 const AREAS = ['Mumbai', 'Delhi', 'Bangalore', 'Hyderabad', 'Chennai'];
 
 const categoryEmojis = {
@@ -33,16 +42,57 @@ export default function Inventory() {
   const [inventoryData, setInventoryData] = useState([]);
   const [loadingInv, setLoadingInv] = useState(true);
 
-  // Fetch this retailer's products from Supabase
+  // Fetch this retailer's products and orders from Supabase to compute live graphs
   useEffect(() => {
     if (!user?.id) return;
     (async () => {
-      const { data } = await supabase
+      const { data: productsData } = await supabase
         .from('products')
         .select('*')
         .eq('retailer_id', user.id)
         .order('created_at', { ascending: false });
-      setInventoryData(data || []);
+
+      const { data: ordersData } = await supabase
+        .from('orders')
+        .select('created_at, items, status')
+        .eq('retailer_id', user.id)
+        .neq('status', 'Cancelled');
+
+      const now = new Date();
+      const monthParams = [];
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        monthParams.push({ year: d.getFullYear(), month: d.getMonth() });
+      }
+
+      const salesMap = {};
+      
+      if (ordersData) {
+        ordersData.forEach(order => {
+          const orderDate = new Date(order.created_at);
+          order.items.forEach(item => {
+            if (!salesMap[item.id]) salesMap[item.id] = { history: [0,0,0,0,0,0], lastSold: null };
+            if (!salesMap[item.id].lastSold || orderDate > salesMap[item.id].lastSold) {
+               salesMap[item.id].lastSold = orderDate;
+            }
+            const orderY = orderDate.getFullYear();
+            const orderM = orderDate.getMonth();
+            monthParams.forEach((m, idx) => {
+              if (m.year === orderY && m.month === orderM) {
+                salesMap[item.id].history[idx] += item.quantity;
+              }
+            });
+          });
+        });
+      }
+
+      const mergedData = (productsData || []).map(p => ({
+        ...p,
+        salesHistory: salesMap[p.id]?.history || [0,0,0,0,0,0],
+        lastSoldDate: salesMap[p.id]?.lastSold || null
+      }));
+
+      setInventoryData(mergedData);
       setLoadingInv(false);
     })();
   }, [user?.id]);
@@ -70,6 +120,8 @@ export default function Inventory() {
   const [aiSellWiseLoading, setAiSellWiseLoading] = useState(false);
   const [aiPopularText, setAiPopularText] = useState('');
   const [aiPopularLoading, setAiPopularLoading] = useState(false);
+  const [aiDeadStockText, setAiDeadStockText] = useState('');
+  const [aiDeadStockLoading, setAiDeadStockLoading] = useState(false);
 
   const handleAiSellWise = async () => {
     setAiSellWiseLoading(true);
@@ -89,6 +141,16 @@ export default function Inventory() {
       setAiPopularText(text);
     } catch { setAiPopularText('⚠️ AI analysis failed. Please try again.'); }
     setAiPopularLoading(false);
+  };
+
+  const handleAiDeadStock = async () => {
+    setAiDeadStockLoading(true);
+    setAiDeadStockText('');
+    try {
+      const text = await analyzeDeadStock(deadStockProducts);
+      setAiDeadStockText(text);
+    } catch { setAiDeadStockText('⚠️ AI analysis failed. Please try again.'); }
+    setAiDeadStockLoading(false);
   };
 
   const LOW_STOCK_THRESHOLD = 10;
@@ -436,6 +498,31 @@ export default function Inventory() {
                 Products with <strong>no or very low sales</strong> in the past 6 months, or not sold in 60+ days. Consider discounting or removing these items.
               </p>
             </div>
+          </div>
+
+          {/* AI Analysis Panel */}
+          <div className="ai-insight-panel">
+            <div className="ai-insight-header">
+              <span className="ai-insight-icon">🤖</span>
+              <span className="ai-insight-title">AI Dead Stock Strategy</span>
+              <button
+                className="btn-ai-analyze"
+                onClick={handleAiDeadStock}
+                disabled={aiDeadStockLoading || deadStockProducts.length === 0}
+              >
+                {aiDeadStockLoading ? <><span className="ai-spinner-inv" /> Analyzing…</> : <><FiCpu /> Liquidate Stock</>}
+              </button>
+            </div>
+            {aiDeadStockText && (
+              <div className="ai-insight-result">
+                {aiDeadStockText.split('\n').map((line, i) => (
+                  <p key={i} style={{ margin: '4px 0' }}>{line}</p>
+                ))}
+              </div>
+            )}
+            {!aiDeadStockText && !aiDeadStockLoading && (
+              <div className="ai-insight-placeholder">Click "Liquidate Stock" to let the Retail AI suggest bundling and promotional strategies for these items.</div>
+            )}
           </div>
 
           {deadStockProducts.length === 0 ? (

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<body>
+<script>
+fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+  method: 'OPTIONS',
+  headers: {
+    'Origin': 'http://localhost:5173'
+  }
+}).then(r => console.log('CORS OK for OPTIONS:', r.status))
+  .catch(e => console.error('OPTIONS FAIL:', e.message));
+
+fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer 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',
+    'Content-Type': 'application/json',
+    'Origin': 'http://localhost:5173'
+  },
+  body: JSON.stringify({
+    model: "google/gemma-3-27b-it",
+    messages: [{role:"user", content:"hi"}],
+    max_tokens: 10
+  })
+}).then(async r => {
+  console.log('CORS OK for POST:', r.status);
+  console.log(await r.json());
+}).catch(e => console.error('POST FAIL:', e.message));
+</script>
+</body>
+</html>
