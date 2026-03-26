@@ -10,8 +10,9 @@ const CATEGORIES = ['All', 'Phones', 'Laptops', 'Audio', 'Wearables', 'Tablets',
 export default function Products() {
   const [searchParams] = useSearchParams();
   const initialCategory = searchParams.get('category') || 'All';
+  const initialSearch = searchParams.get('search') || '';
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [sortBy, setSortBy] = useState('featured');
   const [toast, setToast] = useState(null);
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -24,6 +25,12 @@ export default function Products() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const { user, addToCart, cart } = useAuth();
+
+  // Sync state with URL params if they change dynamically
+  useEffect(() => {
+    const customSearch = searchParams.get('search');
+    if (customSearch !== null) setSearchQuery(customSearch);
+  }, [searchParams]);
 
   // Fetch products from Supabase whenever category changes
   useEffect(() => {

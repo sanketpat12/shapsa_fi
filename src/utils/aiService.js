@@ -140,3 +140,44 @@ export async function analyzePopularInArea(area, products) {
   const prompt = `You are a retail AI. These are my products:\n${productList}\n\nFor the city "${area}" in India, give 2-3 bullet points on which categories/products would likely be most popular and why. Max 70 words. Be specific to the city's demographics.`;
   return await callNvidiaAI(prompt, "", 200);
 }
+/**
+ * True Vision Image Analysis using Llama 3.2 Vision Instruct
+ * @param {string} base64Image - The raw base64 string of the image (without data:image/... prefix)
+ * @param {string} prompt - Question to ask about the image
+ * @returns {Promise<string>} AI description
+ */
+export async function analyzeImageWithAI(base64Image, prompt = "Describe the main subjects or items in this image in detail.") {
+  const payload = {
+    model: "meta/llama-3.2-11b-vision-instruct",
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: prompt },
+          { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
+        ]
+      }
+    ],
+    max_tokens: 300,
+    temperature: 0.3,
+  };
+
+  const response = await fetch(NVIDIA_API_URL, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${NVIDIA_API_KEY}`,
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    console.error("Vision API Error:", err);
+    throw new Error(`Vision API error ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content || "Could not analyze image.";
+}
