@@ -22,8 +22,8 @@ app.use('/api/nvidia', createProxyMiddleware({
 // Serve the static React files from the Vite build directory
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// Send all other requests to the React single-page app
-app.get('*', (req, res) => {
+// Send all other requests to the React single-page app (Fallback for React Router)
+app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
