@@ -65,14 +65,14 @@ export default function Deals() {
               <h3 className="product-name">{product.name}</h3>
               <div className="product-meta">
                 <div>
-                  <span className="product-price">${product.price}</span>
+                  <span className="product-price">₹{product.price}</span>
                   <span style={{
                     textDecoration: 'line-through',
                     color: 'var(--text-muted)',
                     fontSize: '0.85rem',
                     marginLeft: 8
                   }}>
-                    ${product.originalPrice}
+                    ₹{product.originalPrice}
                   </span>
                 </div>
                 <span className="product-rating">

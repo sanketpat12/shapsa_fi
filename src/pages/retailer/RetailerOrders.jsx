@@ -19,19 +19,38 @@ export default function RetailerOrders() {
           status,
           created_at,
           items,
-          customer_id,
-          profiles:customer_id (name, email)
+          customer_id
         `)
         .eq('retailer_id', user.id)
         .order('created_at', { ascending: false });
 
       if (!error && data) {
-        setMyOrders(data);
+        const customerIds = [...new Set(data.map(o => o.customer_id))];
+        const { data: profiles } = await supabase.from('profiles').select('id, name, email').in('id', customerIds);
+        
+        const profileMap = {};
+        if (profiles) profiles.forEach(p => profileMap[p.id] = p);
+        
+        const mergedData = data.map(o => ({
+           ...o,
+           profiles: profileMap[o.customer_id] || null
+        }));
+        setMyOrders(mergedData);
       }
       setLoading(false);
     };
 
     fetchOrders();
+
+    const channel = supabase.channel(`retailer_orders_list_${user?.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `retailer_id=eq.${user?.id}` }, () => {
+        fetchOrders(); // Refetch on update or insert
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
 
   const updateOrderStatus = async (orderId, newStatus) => {

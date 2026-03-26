@@ -202,7 +202,7 @@ export default function AddProduct() {
                   value={form.name} onChange={e => handleFormChange('name', e.target.value)} required />
               </div>
               <div className="form-group">
-                <label>Price ($)</label>
+                <label>Price (₹)</label>
                 <input type="number" className="form-input" placeholder="e.g., 299" min="0" step="0.01"
                   value={form.price} onChange={e => handleFormChange('price', e.target.value)} required />
               </div>
@@ -356,7 +356,7 @@ export default function AddProduct() {
                     </div>
                   </td>
                   <td><span className="badge badge-primary">{product.category}</span></td>
-                  <td style={{ fontWeight: 700 }}>${product.price}</td>
+                  <td style={{ fontWeight: 700 }}>₹{product.price}</td>
                   <td>
                     <span className={`badge ${product.stock <= 5 ? 'badge-danger' : product.stock <= 10 ? 'badge-warning' : 'badge-success'}`}>
                       {product.stock} units

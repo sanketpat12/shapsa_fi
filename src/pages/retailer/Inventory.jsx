@@ -344,7 +344,7 @@ export default function Inventory() {
                                   <span style={{ fontWeight: 600 }}>{product.name}</span>
                                 </div>
                               </td>
-                              <td style={{ fontWeight: 700 }}>${product.price}</td>
+                              <td style={{ fontWeight: 700 }}>₹{product.price}</td>
                               <td>
                                 <div className="stock-cell">
                                   {editingId === product.id ? (
@@ -449,7 +449,7 @@ export default function Inventory() {
                         </div>
                         <div className="dead-meta-row">
                           <span className="dead-meta-label">💰 Stock Value</span>
-                          <span className="dead-meta-val">${(product.stock * product.price).toLocaleString()}</span>
+                          <span className="dead-meta-val">₹{(product.stock * product.price).toLocaleString()}</span>
                         </div>
                       </div>
                       <div className="dead-stock-chart">
@@ -545,7 +545,7 @@ export default function Inventory() {
                       {product.stock} units left
                     </span>
                     <span className="sellwise-meta-label">Stock</span>
-                    <span style={{ fontWeight: 700, color: 'var(--primary)' }}>${product.price}</span>
+                    <span style={{ fontWeight: 700, color: 'var(--primary)' }}>₹{product.price}</span>
                     <span className="sellwise-meta-label">Price</span>
                   </div>
                 </div>
@@ -629,7 +629,7 @@ export default function Inventory() {
                     </div>
 
                     <div className="popular-footer">
-                      <span style={{ fontWeight: 700 }}>${product.price}</span>
+                      <span style={{ fontWeight: 700 }}>₹{product.price}</span>
                       <span style={{ color: getStockBarColor(product.stock), fontSize: '0.82rem' }}>{product.stock} in stock</span>
                     </div>
                   </div>

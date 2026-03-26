@@ -1,7 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import products from '../../data/products';
-import orders from '../../data/orders';
+import { supabase } from '../../lib/supabase';
 import { FiPackage, FiDollarSign, FiAlertTriangle, FiShoppingCart, FiTrendingUp, FiPlus } from 'react-icons/fi';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -10,12 +9,58 @@ import './RetailerDashboard.css';
 export default function RetailerDashboard() {
   const { user } = useAuth();
   const { t } = useTranslation();
-  const retailerId = user.role === 'retailer' ? (user.id === 3 ? 1 : 2) : 1;
 
-  const myProducts = products.filter(p => p.retailerId === retailerId);
-  const myOrders = orders.filter(o => o.retailerId === retailerId);
+  const [myProducts, setMyProducts] = useState([]);
+  const [myOrders, setMyOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchData = async () => {
+      setLoading(true);
+      // Fetch Products
+      const { data: prods } = await supabase
+        .from('products')
+        .select('*')
+        .eq('retailer_id', user.id);
+      
+      // Fetch Orders
+      const { data: ords } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          total_price,
+          status,
+          created_at,
+          items,
+          customer_id
+        `)
+        .eq('retailer_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (prods) setMyProducts(prods);
+      
+      if (ords) {
+        const customerIds = [...new Set(ords.map(o => o.customer_id))];
+        const { data: profiles } = await supabase.from('profiles').select('id, name, email').in('id', customerIds);
+        
+        const profileMap = {};
+        if (profiles) profiles.forEach(p => profileMap[p.id] = p);
+        
+        const mergedOrds = ords.map(o => ({
+           ...o,
+           profiles: profileMap[o.customer_id] || null
+        }));
+        setMyOrders(mergedOrds);
+      }
+      setLoading(false);
+    };
+
+    fetchData();
+  }, [user]);
+
   const lowStockProducts = myProducts.filter(p => p.stock <= 10);
-  const totalRevenue = myOrders.reduce((sum, o) => sum + o.total, 0);
+  const totalRevenue = myOrders.reduce((sum, o) => sum + (Number(o.total_price) || 0), 0);
 
   return (
     <div className="retailer-dashboard page-container animate-fade-in">
@@ -49,7 +94,7 @@ export default function RetailerDashboard() {
           <div className="stat-icon" style={{ background: 'var(--success-bg)', color: 'var(--success)' }}>
             <FiDollarSign />
           </div>
-          <div className="stat-value">${totalRevenue.toLocaleString()}</div>
+          <div className="stat-value">₹{totalRevenue.toLocaleString()}</div>
           <div className="stat-label">{t('dashboard.revenue')}</div>
         </div>
         <div className="stat-card">
@@ -116,17 +161,17 @@ export default function RetailerDashboard() {
             <tbody>
               {myOrders.map(order => (
                 <tr key={order.id}>
-                  <td style={{ fontWeight: 700 }}>{order.id}</td>
-                  <td>{order.customerName}</td>
+                  <td style={{ fontWeight: 700, fontSize: '0.8rem', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={order.id}>{order.id}</td>
+                  <td>{order.profiles?.name || order.profiles?.email || 'Unknown Customer'}</td>
                   <td>{order.items.length} item{order.items.length > 1 ? 's' : ''}</td>
-                  <td style={{ fontWeight: 700 }}>${order.total}</td>
+                  <td style={{ fontWeight: 700 }}>₹{order.total_price}</td>
                   <td>
                     <span className={`status-pill ${order.status.toLowerCase()}`}>
                       <span className="status-dot"></span>
                       {order.status}
                     </span>
                   </td>
-                  <td style={{ color: 'var(--text-muted)' }}>{order.date}</td>
+                  <td style={{ color: 'var(--text-muted)' }}>{new Date(order.created_at).toLocaleDateString()}</td>
                 </tr>
               ))}
             </tbody>
