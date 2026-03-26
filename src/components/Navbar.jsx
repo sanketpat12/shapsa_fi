@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
-import { FiSearch, FiShoppingCart, FiUser, FiLogOut, FiMenu, FiX, FiBell } from 'react-icons/fi';
+import { FiSearch, FiShoppingCart, FiUser, FiLogOut, FiMenu, FiX, FiBell, FiGlobe } from 'react-icons/fi';
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import './Navbar.css';
@@ -125,7 +125,7 @@ export default function Navbar() {
               onClick={() => { setLangOpen(!langOpen); setBellOpen(false); setProfileOpen(false); }}
               title="Change Language"
             >
-              🌐 <span style={{fontSize: '0.8rem', fontWeight: 600, marginLeft: 4}}>{i18n.language.toUpperCase()}</span>
+              <FiGlobe size={20} /> <span style={{fontSize: '0.8rem', fontWeight: 600, marginLeft: 6}}>{i18n.language.toUpperCase()}</span>
             </button>
             {langOpen && (
               <div className="profile-dropdown" style={{ minWidth: '160px' }}>

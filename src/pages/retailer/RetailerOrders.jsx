@@ -20,7 +20,8 @@ export default function RetailerOrders() {
           status,
           created_at,
           items,
-          customer_id
+          customer_id,
+          shipping_address
         `)
         .eq('retailer_id', user.id)
         .order('created_at', { ascending: false });
@@ -151,18 +152,36 @@ export default function RetailerOrders() {
               filteredOrders.map(order => (
                 <tr key={order.id}>
                   <td style={{ fontWeight: 700, fontSize: '0.8rem', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={order.id}>{order.id}</td>
-                  <td style={{ fontWeight: 500 }}>{order.profiles?.name && order.profiles.name !== order.profiles.email ? order.profiles.name : (order.profiles?.email || `Customer (${order.customer_id.slice(0, 8)})`)}</td>
+                  <td>
+                    <div style={{ fontWeight: 600, color: 'var(--text-dark)', marginBottom: 2 }}>
+                      {order.profiles?.name && order.profiles.name !== order.profiles.email ? order.profiles.name : 'Customer'}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 500 }}>
+                      📧 {order.profiles?.email || `ID: ${order.customer_id.slice(0, 8)}`}
+                    </div>
+                    {order.shipping_address && (
+                      <div style={{ marginTop: 6, fontSize: '0.75rem', color: 'var(--text-muted)', background: 'var(--bg-secondary)', padding: '6px', borderRadius: 6, maxWidth: 220, whiteSpace: 'pre-wrap' }}>
+                        📍 {order.shipping_address}
+                      </div>
+                    )}
+                  </td>
                   <td>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       {order.items.map((item, i) => (
                         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem' }}>
                           <img src={item.image} alt={item.name} style={{ width: 28, height: 28, borderRadius: 4, objectFit: 'cover' }} />
-                          {item.name} x{item.quantity}
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span>{item.name} x{item.quantity}</span>
+                            <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>@ ₹{item.price}/ea</span>
+                          </div>
                         </div>
                       ))}
                     </div>
                   </td>
-                  <td style={{ fontWeight: 700 }}>₹{order.total_price}</td>
+                  <td>
+                    <div style={{ fontWeight: 700 }}>₹{order.total_price}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>(incl. 8% tax)</div>
+                  </td>
                   <td>
                     {order.status === 'Cancelled' ? (
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>

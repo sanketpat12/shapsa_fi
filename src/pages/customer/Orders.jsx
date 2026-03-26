@@ -13,7 +13,7 @@ export default function Orders() {
       if (!user) return;
       const { data, error } = await supabase
         .from('orders')
-        .select('*')
+        .select('*, shipping_address')
         .eq('customer_id', user.id)
         .order('created_at', { ascending: false });
 
@@ -133,6 +133,14 @@ export default function Orders() {
                     <span style={{ color: 'var(--text-muted)' }}>Total</span>
                     <p style={{ fontWeight: 700, color: 'var(--text-dark)' }}>₹{order.total_price}</p>
                   </div>
+                  {order.shipping_address && (
+                    <div style={{ maxWidth: 200 }}>
+                      <span style={{ color: 'var(--text-muted)' }}>Delivering To</span>
+                      <p style={{ fontWeight: 500, color: 'var(--text-dark)', fontSize: '0.75rem', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={order.shipping_address}>
+                        📍 {order.shipping_address}
+                      </p>
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                   {order.status === 'Pending' && (

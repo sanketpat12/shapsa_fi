@@ -153,6 +153,39 @@ export async function analyzeDeadStock(deadProducts) {
 }
 
 /**
+ * Automatically dynamically detect which products are Dead Stock using AI.
+ * @param {Array} inventory - Full array of products with their sales history
+ * @returns {Promise<Array<string>>} - Array of product IDs determined to be dead stock
+ */
+export async function detectDeadStockIds(inventory) {
+  if (!inventory || inventory.length === 0) return [];
+  const simplified = inventory.map(p => ({
+    id: p.id,
+    salesCount: (p.salesHistory || []).reduce((a, b) => a + b, 0),
+    stock: p.stock
+  }));
+  
+  const prompt = `You are an AI retail data analyst. Look at this inventory:
+${JSON.stringify(simplified)}
+
+Your job is to identify which items are "Dead Stock" (items with very low logic sales vs stock, e.g. 0 to 2 total sales max). 
+Return ONLY a strictly valid bare JSON array of strings representing the "id" properties of the dead items, like ["id1", "id2"]. 
+Do NOT output anything else. No markdown, no intro text, just the raw array brackets.`;
+
+  try {
+    let result = await callNvidiaAI(prompt, "", 500);
+    // clean up any markdown if the LLM leaked it
+    result = result.replace(/```json/g, "").replace(/```/g, "").trim();
+    const ids = JSON.parse(result);
+    return Array.isArray(ids) ? ids : [];
+  } catch (err) {
+    console.error("AI Detection Error:", err);
+    // fallback to math if AI completely fails JSON parsing
+    return simplified.filter(p => p.salesCount <= 2).map(p => p.id);
+  }
+}
+
+/**
  * True Vision Image Analysis using Llama 3.2 Vision Instruct
  * @param {string} base64Image - The raw base64 string of the image (without data:image/... prefix)
  * @param {string} prompt - Question to ask about the image

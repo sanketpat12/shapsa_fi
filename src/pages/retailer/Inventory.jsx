@@ -1,11 +1,11 @@
-import { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { analyzeSellWiseDemand, analyzePopularInArea, analyzeDeadStock } from '../../utils/aiService';
+import { analyzeSellWiseDemand, analyzePopularInArea, analyzeDeadStock, detectDeadStockIds } from '../../utils/aiService';
 import {
   FiAlertTriangle, FiEdit2, FiCheck, FiX, FiSearch,
   FiChevronDown, FiChevronUp, FiPackage, FiTrendingUp,
-  FiMapPin, FiBarChart2, FiBox, FiCpu
+  FiMapPin, FiBarChart2, FiBox, FiCpu, FiArchive
 } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 import './Inventory.css';
@@ -20,7 +20,7 @@ const getDynamicMonths = () => {
   return labels;
 };
 const MONTHS = getDynamicMonths();
-const AREAS = ['Mumbai', 'Delhi', 'Bangalore', 'Hyderabad', 'Chennai'];
+const defaultAreas = ['Mumbai', 'Delhi', 'Bangalore', 'Hyderabad', 'Chennai'];
 
 const categoryEmojis = {
   'Audio': '🎧', 'Phones': '📱', 'Laptops': '💻', 'Wearables': '⌚',
@@ -40,7 +40,25 @@ export default function Inventory() {
   const { t } = useTranslation();
 
   const [inventoryData, setInventoryData] = useState([]);
-  const [loadingInv, setLoadingInv] = useState(true);
+
+  const [activeTab, setActiveTab] = useState('stock');
+  const [editingId, setEditingId] = useState(null);
+  const [editStock, setEditStock] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [collapsedCategories, setCollapsedCategories] = useState({});
+  const [selectedArea, setSelectedArea] = useState('Mumbai');
+  const [dynamicAreas, setDynamicAreas] = useState(defaultAreas);
+  const [deadStockIds, setDeadStockIds] = useState([]);
+  const [isDetectingDeadStock, setIsDetectingDeadStock] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  // Discount Modal state
+  const [discountModal, setDiscountModal] = useState(null); // { product }
+  const [discountPct, setDiscountPct] = useState(10);
+  const [discountLabel, setDiscountLabel] = useState('');
+  const [discountSaving, setDiscountSaving] = useState(false);
 
   // Fetch this retailer's products and orders from Supabase to compute live graphs
   useEffect(() => {
@@ -54,7 +72,7 @@ export default function Inventory() {
 
       const { data: ordersData } = await supabase
         .from('orders')
-        .select('created_at, items, status')
+        .select('created_at, items, status, shipping_address')
         .eq('retailer_id', user.id)
         .neq('status', 'Cancelled');
 
@@ -84,6 +102,21 @@ export default function Inventory() {
             });
           });
         });
+        
+        // Extract unique cities/areas from shipping_address (simplistic extraction: take text before last comma)
+        const extractedAreas = new Set();
+        ordersData.forEach(o => {
+          if (o.shipping_address) {
+            const parts = o.shipping_address.split(',').map(s => s.trim());
+            if (parts.length > 1) extractedAreas.add(parts[parts.length - 2]); // e.g. "Street, City, Pin" -> City
+            else extractedAreas.add(o.shipping_address);
+          }
+        });
+        if (extractedAreas.size > 0) {
+          const areasArr = Array.from(extractedAreas).filter(Boolean);
+          setDynamicAreas(areasArr);
+          setSelectedArea(areasArr[0]);
+        }
       }
 
       const mergedData = (productsData || []).map(p => ({
@@ -93,27 +126,83 @@ export default function Inventory() {
       }));
 
       setInventoryData(mergedData);
-      setLoadingInv(false);
     })();
   }, [user?.id]);
 
+  // ─── Supabase Real-time: auto-refresh on any product change ───
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel('inventory-realtime')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'products',
+        filter: `retailer_id=eq.${user.id}`
+      }, (payload) => {
+        if (payload.eventType === 'DELETE') {
+          setInventoryData(prev => prev.filter(p => p.id !== payload.old.id));
+        } else if (payload.eventType === 'INSERT') {
+          setInventoryData(prev => [{ ...payload.new, salesHistory: [0,0,0,0,0,0], lastSoldDate: null }, ...prev]);
+        } else if (payload.eventType === 'UPDATE') {
+          setInventoryData(prev => prev.map(p =>
+            p.id === payload.new.id ? { ...p, ...payload.new } : p
+          ));
+        }
+      })
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }, [user?.id]);
 
   const TABS = [
     { id: 'stock', label: t('nav.inventory'), icon: <FiBox /> },
-    { id: 'deadstock', label: t('common.deadStock'), icon: <FiAlertTriangle /> },
+    { id: 'deadstock', label: t('common.deadStock'), icon: <FiArchive /> },
     { id: 'sellwise', label: 'Sell Wise Demand', icon: <FiTrendingUp /> },
     { id: 'popular', label: 'Popular in Area', icon: <FiMapPin /> },
   ];
 
-  const [activeTab, setActiveTab] = useState('stock');
-  const [editingId, setEditingId] = useState(null);
-  const [editStock, setEditStock] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [categoryFilter, setCategoryFilter] = useState('all');
-  const [collapsedCategories, setCollapsedCategories] = useState({});
-  const [selectedArea, setSelectedArea] = useState('Mumbai');
-  const [toast, setToast] = useState(null);
+  const handleOpenDiscount = (product) => {
+    setDiscountModal({ product });
+    setDiscountPct(product.discount || 10);
+    setDiscountLabel(product.deal_label || 'Flash Sale');
+  };
+
+  const handleSaveDiscount = async () => {
+    if (!discountModal) return;
+    setDiscountSaving(true);
+    const { error } = await supabase
+      .from('products')
+      .update({ discount: discountPct, deal_label: discountLabel, deal_active: true })
+      .eq('id', discountModal.product.id);
+    if (error) {
+      setToast('❌ Failed to save discount');
+    } else {
+      setInventoryData(prev => prev.map(p =>
+        p.id === discountModal.product.id ? { ...p, discount: discountPct, deal_label: discountLabel, deal_active: true } : p
+      ));
+      setToast(`✅ Deal live! ${discountPct}% off "${discountModal.product.name}"`);
+      setDiscountModal(null);
+    }
+    setDiscountSaving(false);
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleRemoveDeal = async (productId) => {
+    await supabase.from('products').update({ discount: 0, deal_label: null, deal_active: false }).eq('id', productId);
+    setInventoryData(prev => prev.map(p => p.id === productId ? { ...p, discount: 0, deal_label: null, deal_active: false } : p));
+    setToast('🚫 Deal removed');
+    setTimeout(() => setToast(null), 2000);
+  };
+
+  const handleRemoveProduct = async (productId) => {
+    if (!window.confirm('Remove this product permanently?')) return;
+    const { error } = await supabase.from('products').delete().eq('id', productId);
+    if (!error) {
+      setInventoryData(prev => prev.filter(p => p.id !== productId));
+      setToast('🗑️ Product removed');
+      setTimeout(() => setToast(null), 2000);
+    }
+  };
 
   // AI Analysis state
   const [aiSellWiseText, setAiSellWiseText] = useState('');
@@ -161,14 +250,31 @@ export default function Inventory() {
   const lowStockCount = inventoryData.filter(p => p.stock <= LOW_STOCK_THRESHOLD).length;
   const criticalCount = inventoryData.filter(p => p.stock <= CRITICAL_THRESHOLD).length;
 
-  // Dead Stock Detection
+  // Dead Stock Detection – AI detects low-sales items on first tab visit
+  const detectingRef = React.useRef(false);
+  useEffect(() => {
+    if (activeTab !== 'deadstock') return;
+    if (inventoryData.length === 0) return;
+    if (deadStockIds.length > 0) return;
+    if (detectingRef.current) return;
+
+    async function run() {
+      detectingRef.current = true;
+      setIsDetectingDeadStock(true);
+      try {
+        const ids = await detectDeadStockIds(inventoryData);
+        setDeadStockIds(ids);
+      } catch (_e) { /* silent on AI errors */ } // eslint-disable-line no-unused-vars
+      setIsDetectingDeadStock(false);
+      detectingRef.current = false;
+    }
+    run();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, inventoryData.length]);
+
   const deadStockProducts = useMemo(() => {
-    return inventoryData.filter(p => {
-      const totalSales = (p.salesHistory || []).reduce((a, b) => a + b, 0);
-      const days = daysSince(p.lastSoldDate);
-      return totalSales <= DEAD_STOCK_SALES_MAX || days >= DEAD_STOCK_DAYS;
-    });
-  }, [inventoryData]);
+    return inventoryData.filter(p => deadStockIds.includes(p.id));
+  }, [inventoryData, deadStockIds]);
 
   // Sell Wise Demand: sort by total sales desc
   const sellWiseProducts = useMemo(() => {
@@ -491,7 +597,9 @@ export default function Inventory() {
       {activeTab === 'deadstock' && (
         <div className="tab-section animate-fade-in">
           <div className="inv-section-header">
-            <div className="inv-section-icon deadstock-icon">🪦</div>
+            <div className="inv-section-icon deadstock-icon" style={{ background: 'var(--danger-bg)', color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <FiArchive size={28} />
+            </div>
             <div>
               <h2 className="inv-section-title">Dead Stock Detection</h2>
               <p className="inv-section-desc">
@@ -502,16 +610,13 @@ export default function Inventory() {
 
           {/* AI Analysis Panel */}
           <div className="ai-insight-panel">
-            <div className="ai-insight-header">
-              <span className="ai-insight-icon">🤖</span>
-              <span className="ai-insight-title">AI Dead Stock Strategy</span>
-              <button
-                className="btn-ai-analyze"
-                onClick={handleAiDeadStock}
-                disabled={aiDeadStockLoading || deadStockProducts.length === 0}
-              >
-                {aiDeadStockLoading ? <><span className="ai-spinner-inv" /> Analyzing…</> : <><FiCpu /> Liquidate Stock</>}
-              </button>
+            <div className="section-header">
+              <h2><FiArchive /> {t('common.deadStock')} Analysis</h2>
+              <div className="section-actions">
+                <button className="btn btn-outline" onClick={handleAiDeadStock} disabled={aiDeadStockLoading || isDetectingDeadStock || deadStockProducts.length === 0}>
+                   <FiCpu /> {aiDeadStockLoading ? 'Analyzing...' : isDetectingDeadStock ? 'NVIDIA Processing...' : 'Get Strategy'}
+                </button>
+              </div>
             </div>
             {aiDeadStockText && (
               <div className="ai-insight-result">
@@ -521,18 +626,24 @@ export default function Inventory() {
               </div>
             )}
             {!aiDeadStockText && !aiDeadStockLoading && (
-              <div className="ai-insight-placeholder">Click "Liquidate Stock" to let the Retail AI suggest bundling and promotional strategies for these items.</div>
+              <div className="ai-insight-placeholder">Waiting for AI to analyze stock data...</div>
             )}
           </div>
 
-          {deadStockProducts.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-icon">🎉</div>
-              <h3>No dead stock!</h3>
-              <p>All your products are selling well. Keep it up!</p>
-            </div>
-          ) : (
-            <div className="dead-stock-grid">
+            {isDetectingDeadStock ? (
+              <div className="empty-state">
+                <div style={{ fontSize: 40, marginBottom: 16 }}>🤖</div>
+                <h3 style={{ color: 'var(--primary)' }}>NVIDIA AI is analyzing your inventory...</h3>
+                <p>Detecting critically low sales velocity...</p>
+              </div>
+            ) : deadStockProducts.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-icon">✅</div>
+                <h3>No dead stock found!</h3>
+                <p>Your AI says inventory is moving well.</p>
+              </div>
+            ) : (
+              <div className="inventory-grid">
               {deadStockProducts.map(product => {
                 const totalSales = (product.salesHistory || []).reduce((a, b) => a + b, 0);
                 const days = daysSince(product.lastSoldDate);
@@ -585,8 +696,12 @@ export default function Inventory() {
                         </div>
                       </div>
                       <div className="dead-stock-actions">
-                        <button className="btn btn-sm" style={{ background: 'var(--warning-bg)', color: 'var(--warning)', flex: 1 }}>🏷️ Discount</button>
-                        <button className="btn btn-sm" style={{ background: 'var(--danger-bg)', color: 'var(--danger)', flex: 1 }}>🗑️ Remove</button>
+                        {product.deal_active ? (
+                          <button className="btn btn-sm" style={{ background: 'var(--success-bg)', color: 'var(--success)', flex: 1 }} onClick={() => handleRemoveDeal(product.id)}>✅ Deal Active — Remove</button>
+                        ) : (
+                          <button className="btn btn-sm" style={{ background: 'var(--warning-bg)', color: 'var(--warning)', flex: 1 }} onClick={() => handleOpenDiscount(product)}>🏷️ Add Deal</button>
+                        )}
+                        <button className="btn btn-sm" style={{ background: 'var(--danger-bg)', color: 'var(--danger)', flex: 1 }} onClick={() => handleRemoveProduct(product.id)}>🗑️ Remove</button>
                       </div>
                     </div>
                   </div>
@@ -734,7 +849,7 @@ export default function Inventory() {
           {/* Area Selector */}
           <div className="area-selector">
             <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', alignSelf: 'center' }}>📍 Select Area:</span>
-            {AREAS.map(area => (
+            {dynamicAreas.map(area => (
               <button
                 key={area}
                 className={`area-btn ${selectedArea === area ? 'active' : ''}`}
@@ -803,6 +918,48 @@ export default function Inventory() {
       )}
 
       {toast && <div className="toast success">{toast}</div>}
+
+      {/* ── DISCOUNT MODAL ── */}
+      {discountModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'var(--bg-white)', borderRadius: 'var(--radius-xl)', padding: 32, width: 420, maxWidth: '90vw', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+            <h3 style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>🏷️ Create Deal</h3>
+            <p style={{ color: 'var(--text-muted)', marginBottom: 24 }}>Set a discount for <strong>{discountModal.product.name}</strong> — it will instantly appear on the customer Deals page.</p>
+            
+            <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: '0.85rem' }}>Discount Percentage</label>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+              {[10, 15, 20, 25, 30, 50].map(pct => (
+                <button key={pct} onClick={() => setDiscountPct(pct)}
+                  style={{ flex: 1, padding: '8px 4px', borderRadius: 8, border: discountPct === pct ? '2px solid var(--primary)' : '2px solid var(--border)', background: discountPct === pct ? 'rgba(255,107,53,0.1)' : 'var(--bg-secondary)', fontWeight: 700, cursor: 'pointer', color: discountPct === pct ? 'var(--primary)' : 'var(--text)', fontSize: '0.85rem' }}>
+                  {pct}%
+                </button>
+              ))}
+            </div>
+
+            <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: '0.85rem' }}>Deal Label</label>
+            <input
+              type="text"
+              value={discountLabel}
+              onChange={e => setDiscountLabel(e.target.value)}
+              placeholder="e.g. Flash Sale, Clearance, Weekend Deal"
+              style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1.5px solid var(--border)', background: 'var(--bg-secondary)', fontSize: '0.9rem', marginBottom: 24, boxSizing: 'border-box' }}
+            />
+
+            <div style={{ background: 'rgba(255,107,53,0.08)', borderRadius: 10, padding: '12px 16px', marginBottom: 24 }}>
+              <span style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--primary)' }}>₹{Math.round(discountModal.product.price * (1 - discountPct / 100))}</span>
+              <span style={{ textDecoration: 'line-through', color: 'var(--text-muted)', marginLeft: 8 }}>₹{discountModal.product.price}</span>
+              <span style={{ marginLeft: 8, background: 'var(--danger)', color: 'white', fontSize: '0.75rem', padding: '2px 8px', borderRadius: 20, fontWeight: 700 }}>{discountPct}% OFF</span>
+            </div>
+
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setDiscountModal(null)} disabled={discountSaving}>Cancel</button>
+              <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSaveDiscount} disabled={discountSaving}>
+                {discountSaving ? 'Saving...' : '🚀 Go Live!'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

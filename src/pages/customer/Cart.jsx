@@ -10,6 +10,7 @@ export default function Cart() {
   const [checkingOut, setCheckingOut] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [stockWarning, setStockWarning] = useState(null);
+  const [shippingAddress, setShippingAddress] = useState('');
 
   const handleCheckout = async () => {
     if (!user) return alert('Please log in to checkout');
@@ -59,7 +60,8 @@ export default function Cart() {
           retailer_id: retailerId,
           items: items,
           total_price: Number(totalWithTax.toFixed(2)),
-          status: 'Pending'
+          status: 'Pending',
+          shipping_address: shippingAddress
         };
       });
 
@@ -215,9 +217,27 @@ export default function Cart() {
               <span>₹{(cartTotal * 1.08).toFixed(2)}</span>
             </div>
           </div>
+          
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 8, color: 'var(--text-dark)' }}>Shipping Address</label>
+            <textarea
+              value={shippingAddress}
+              onChange={(e) => setShippingAddress(e.target.value)}
+              placeholder="Enter your full delivery address..."
+              style={{ width: '100%', padding: '12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-secondary)', resize: 'vertical', minHeight: 80, boxSizing: 'border-box' }}
+              required
+            />
+          </div>
+
           <button
             className="btn btn-primary btn-lg checkout-btn"
-            onClick={handleCheckout}
+            onClick={() => {
+              if (!shippingAddress.trim()) {
+                alert("Please enter a shipping address before checkout.");
+                return;
+              }
+              handleCheckout();
+            }}
             disabled={checkingOut}
           >
             {checkingOut ? 'Processing...' : 'Checkout'}
