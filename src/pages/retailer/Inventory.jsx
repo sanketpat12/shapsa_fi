@@ -1,10 +1,11 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { analyzeSellWiseDemand, analyzePopularInArea } from '../../utils/aiService';
 import {
   FiAlertTriangle, FiEdit2, FiCheck, FiX, FiSearch,
   FiChevronDown, FiChevronUp, FiPackage, FiTrendingUp,
-  FiMapPin, FiBarChart2, FiBox
+  FiMapPin, FiBarChart2, FiBox, FiCpu
 } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 import './Inventory.css';
@@ -63,6 +64,32 @@ export default function Inventory() {
   const [collapsedCategories, setCollapsedCategories] = useState({});
   const [selectedArea, setSelectedArea] = useState('Mumbai');
   const [toast, setToast] = useState(null);
+
+  // AI Analysis state
+  const [aiSellWiseText, setAiSellWiseText] = useState('');
+  const [aiSellWiseLoading, setAiSellWiseLoading] = useState(false);
+  const [aiPopularText, setAiPopularText] = useState('');
+  const [aiPopularLoading, setAiPopularLoading] = useState(false);
+
+  const handleAiSellWise = async () => {
+    setAiSellWiseLoading(true);
+    setAiSellWiseText('');
+    try {
+      const text = await analyzeSellWiseDemand(sellWiseProducts);
+      setAiSellWiseText(text);
+    } catch { setAiSellWiseText('⚠️ AI analysis failed. Please try again.'); }
+    setAiSellWiseLoading(false);
+  };
+
+  const handleAiPopular = async () => {
+    setAiPopularLoading(true);
+    setAiPopularText('');
+    try {
+      const text = await analyzePopularInArea(selectedArea, popularProducts);
+      setAiPopularText(text);
+    } catch { setAiPopularText('⚠️ AI analysis failed. Please try again.'); }
+    setAiPopularLoading(false);
+  };
 
   const LOW_STOCK_THRESHOLD = 10;
   const CRITICAL_THRESHOLD = 5;
@@ -492,9 +519,33 @@ export default function Inventory() {
               <h2 className="inv-section-title">Sell Wise Demand</h2>
               <p className="inv-section-desc">
                 Products ranked by <strong>total sales velocity</strong> over the past 6 months. Use this to prioritize restocking and promotions.
-                <span className="ai-badge-soon">🤖 AI Analysis Coming Soon</span>
               </p>
             </div>
+          </div>
+
+          {/* AI Analysis Panel */}
+          <div className="ai-insight-panel">
+            <div className="ai-insight-header">
+              <span className="ai-insight-icon">🤖</span>
+              <span className="ai-insight-title">AI Demand Analysis</span>
+              <button
+                className="btn-ai-analyze"
+                onClick={handleAiSellWise}
+                disabled={aiSellWiseLoading || sellWiseProducts.length === 0}
+              >
+                {aiSellWiseLoading ? <><span className="ai-spinner-inv" /> Analyzing…</> : <><FiCpu /> Get AI Analysis</>}
+              </button>
+            </div>
+            {aiSellWiseText && (
+              <div className="ai-insight-result">
+                {aiSellWiseText.split('\n').map((line, i) => (
+                  <p key={i} style={{ margin: '4px 0' }}>{line}</p>
+                ))}
+              </div>
+            )}
+            {!aiSellWiseText && !aiSellWiseLoading && (
+              <div className="ai-insight-placeholder">Click "Get AI Analysis" to receive intelligent restocking recommendations powered by Gemma AI.</div>
+            )}
           </div>
 
           <div className="sellwise-list">
@@ -564,9 +615,33 @@ export default function Inventory() {
               <h2 className="inv-section-title">Popular in Area</h2>
               <p className="inv-section-desc">
                 See which products have the <strong>highest demand by city/region</strong>. Optimize your stocking strategy based on local trends.
-                <span className="ai-badge-soon">🤖 AI Analysis Coming Soon</span>
               </p>
             </div>
+          </div>
+
+          {/* AI Analysis Panel */}
+          <div className="ai-insight-panel">
+            <div className="ai-insight-header">
+              <span className="ai-insight-icon">🤖</span>
+              <span className="ai-insight-title">AI Area Insights for <strong>{selectedArea}</strong></span>
+              <button
+                className="btn-ai-analyze"
+                onClick={handleAiPopular}
+                disabled={aiPopularLoading || popularProducts.length === 0}
+              >
+                {aiPopularLoading ? <><span className="ai-spinner-inv" /> Analyzing…</> : <><FiCpu /> Get AI Insights</>}
+              </button>
+            </div>
+            {aiPopularText && (
+              <div className="ai-insight-result">
+                {aiPopularText.split('\n').map((line, i) => (
+                  <p key={i} style={{ margin: '4px 0' }}>{line}</p>
+                ))}
+              </div>
+            )}
+            {!aiPopularText && !aiPopularLoading && (
+              <div className="ai-insight-placeholder">Click "Get AI Insights" to learn what products are trending in {selectedArea} based on local demographics.</div>
+            )}
           </div>
 
           {/* Area Selector */}

@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
+import AIAssistant from './components/AIAssistant';
 import Login from './pages/Login';
 import Register from './pages/Register';
 
@@ -68,6 +69,8 @@ function AppRoutes() {
           {newOrderToast}
         </div>
       )}
+      {/* AI Shopping Assistant — only for customers */}
+      {user?.role === 'customer' && <AIAssistant />}
       <Routes>
         <Route path="/login" element={user ? <Navigate to={`/${user.role}`} /> : <Login />} />
         <Route path="/register" element={user ? <Navigate to={`/${user.role}`} /> : <Register />} />

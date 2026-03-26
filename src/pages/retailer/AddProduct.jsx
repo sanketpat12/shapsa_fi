@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { categoryKeywords } from '../../data/products';
-import { FiPlus, FiEdit2, FiTrash2, FiImage, FiCpu, FiTag, FiCheck } from 'react-icons/fi';
+import { generateProductDescription } from '../../utils/aiService';
+import { FiPlus, FiEdit2, FiTrash2, FiImage, FiCpu, FiTag, FiCheck, FiZap } from 'react-icons/fi';
 import './AddProduct.css';
 
 const CATEGORIES = ['Phones', 'Laptops', 'Audio', 'Wearables', 'Tablets', 'Gaming', 'Camera', 'Smart Home', 'Accessories', 'Food', 'Snacks', 'Handcraft', 'Groceries', 'Clothing'];
@@ -51,6 +52,22 @@ export default function AddProduct() {
   const [aiRan, setAiRan] = useState(false);
   const [selectedAiCat, setSelectedAiCat] = useState(null);
   const debounceRef = useRef(null);
+
+  // AI Description Autofill state
+  const [aiDescLoading, setAiDescLoading] = useState(false);
+
+  const handleAiAutofillDescription = async () => {
+    if (!form.name) return;
+    setAiDescLoading(true);
+    try {
+      const desc = await generateProductDescription(form.name, form.category);
+      setForm(prev => ({ ...prev, description: desc.trim() }));
+    } catch (err) {
+      console.error('AI description error:', err);
+    } finally {
+      setAiDescLoading(false);
+    }
+  };
 
   // Fetch this retailer's products from Supabase
   const fetchMyProducts = async () => {
@@ -214,8 +231,23 @@ export default function AddProduct() {
             </div>
 
             <div className="form-group">
-              <label>Description <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '0.8rem' }}>(helps AI detect category)</span></label>
-              <textarea className="form-input" placeholder="Describe your product..."
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <label style={{ margin: 0 }}>Description <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '0.8rem' }}>(helps AI detect category)</span></label>
+                <button
+                  type="button"
+                  className="btn-ai-autofill"
+                  onClick={handleAiAutofillDescription}
+                  disabled={aiDescLoading || !form.name}
+                  title={!form.name ? 'Enter a product name first' : 'Generate description with AI'}
+                >
+                  {aiDescLoading ? (
+                    <><span className="ai-spinner-sm" /> Generating…</>
+                  ) : (
+                    <><FiZap /> ✨ AI Autofill</>
+                  )}
+                </button>
+              </div>
+              <textarea className="form-input" placeholder="Describe your product, or click ✨ AI Autofill above…"
                 value={form.description} onChange={e => handleFormChange('description', e.target.value)} rows={3} required />
             </div>
 
