@@ -27,18 +27,52 @@ export default function Orders() {
   }, [user]);
 
   const handleCancelOrder = async (orderId) => {
-    if (!window.confirm("Are you sure you want to cancel this order?")) return;
+    if (!window.confirm("Are you sure you want to cancel this order? Stock will be restored.")) return;
 
+    // Get the order items first (so we can restore stock)
+    const orderToCancel = userOrders.find(o => o.id === orderId);
+    if (!orderToCancel) return;
+
+    // Try direct update first
     const { error } = await supabase
       .from('orders')
       .update({ status: 'Cancelled' })
       .eq('id', orderId)
-      .eq('status', 'Pending'); // Ensure only pending can be cancelled
+      .eq('customer_id', user.id); // RLS already restricts Pending-only
 
     if (!error) {
+      // Restore stock for each item
+      if (orderToCancel.items) {
+        for (const item of orderToCancel.items) {
+          if (item.id) {
+            await supabase.rpc('restore_stock', {
+              product_id: item.id,
+              qty: item.quantity
+            });
+          }
+        }
+      }
       setUserOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'Cancelled' } : o));
     } else {
-      alert("Could not cancel order.");
+      console.error('Cancel order error:', error);
+      // Fallback: use the cancel_order RPC which bypasses RLS
+      const { error: rpcError } = await supabase.rpc('cancel_order', {
+        order_id: orderId,
+        cust_id: user.id
+      });
+      if (!rpcError) {
+        if (orderToCancel.items) {
+          for (const item of orderToCancel.items) {
+            if (item.id) {
+              await supabase.rpc('restore_stock', { product_id: item.id, qty: item.quantity });
+            }
+          }
+        }
+        setUserOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'Cancelled' } : o));
+      } else {
+        console.error('Cancel RPC error:', rpcError);
+        alert("Could not cancel order: " + rpcError.message);
+      }
     }
   };
 

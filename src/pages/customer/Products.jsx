@@ -23,7 +23,7 @@ export default function Products() {
   ];
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { user, addToCart } = useAuth();
+  const { user, addToCart, cart } = useAuth();
 
   // Fetch products from Supabase whenever category changes
   useEffect(() => {
@@ -68,8 +68,20 @@ export default function Products() {
 
   const handleAddToCart = (product, e) => {
     if (e) e.stopPropagation();
+    if (!product.stock || product.stock <= 0) {
+      setToast(`❌ ${product.name} is out of stock!`);
+      setTimeout(() => setToast(null), 2500);
+      return;
+    }
+    // Check how many already in cart
+    const inCart = cart.find(i => i.id === product.id);
+    if (inCart && inCart.quantity >= product.stock) {
+      setToast(`❌ Only ${product.stock} unit${product.stock > 1 ? 's' : ''} available!`);
+      setTimeout(() => setToast(null), 2500);
+      return;
+    }
     addToCart(product);
-    setToast(`${product.name} added to cart!`);
+    setToast(`✅ ${product.name} added to cart!`);
     setTimeout(() => setToast(null), 2000);
   };
 
@@ -106,22 +118,30 @@ export default function Products() {
       status: 'Pending'
     };
 
+    // Validate stock before buying
+    const { data: stockData } = await supabase.from('products').select('stock').eq('id', product.id).single();
+    if (stockData && stockData.stock <= 0) {
+      alert('Sorry, this product is out of stock!');
+      return;
+    }
+
     const { error } = await supabase.from('orders').insert([orderToInsert]);
     
     if (error) {
       console.error('Buy Now error:', error);
       alert('Failed to place order: ' + error.message);
     } else {
-      // Decrement stock for this single product
-      if (product.id && product.id.toString().length > 20) {
-        const { data } = await supabase.from('products').select('stock').eq('id', product.id).single();
-        if (data) {
-          const newStock = Math.max(0, data.stock - 1);
-          await supabase.from('products').update({ stock: newStock }).eq('id', product.id);
-        }
-      }
+      // Decrement stock via secure RPC
+      await supabase.rpc('decrement_stock', { product_id: product.id, qty: 1 });
+      // Save customer profile for retailer
+      await supabase.from('profiles').upsert({
+        id: user.id,
+        email: user.email,
+        name: user.name || user.email,
+        role: user.role || 'customer',
+      }, { onConflict: 'id' });
 
-      setToast(`Order placed successfully!`);
+      setToast(`✅ Order placed successfully!`);
       setTimeout(() => setToast(null), 3000);
       setSelectedProduct(null); // Close modal
     }
@@ -189,9 +209,10 @@ export default function Products() {
               onClick={() => setSelectedProduct(product)}
             >
               {product.badge && <span className="product-badge">{product.badge}</span>}
+              {product.stock === 0 && <span className="product-badge" style={{ background: '#ef4444' }}>Out of Stock</span>}
               <div className="product-img-container">
                 {product.image ? (
-                  <img src={product.image} alt={product.name} className="product-img" />
+                  <img src={product.image} alt={product.name} className="product-img" style={{ opacity: product.stock === 0 ? 0.5 : 1 }} />
                 ) : (
                   <div className="product-img" style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -203,7 +224,8 @@ export default function Products() {
                 <button
                   className="quick-add-btn"
                   onClick={(e) => handleAddToCart(product, e)}
-                  title="Add to Cart"
+                  title={product.stock === 0 ? 'Out of Stock' : 'Add to Cart'}
+                  disabled={product.stock === 0}
                 >
                   <FiShoppingCart />
                 </button>
@@ -220,11 +242,16 @@ export default function Products() {
                     <FiStar className="star-filled" /> {product.rating || '—'}
                   </span>
                 </div>
+                {product.stock > 0 && product.stock <= 5 && (
+                  <p style={{ fontSize: '0.78rem', color: '#ef4444', fontWeight: 600, margin: '4px 0 0' }}>Only {product.stock} left!</p>
+                )}
                 <button
                   className="btn btn-primary btn-sm add-cart-btn"
                   onClick={(e) => handleAddToCart(product, e)}
+                  disabled={product.stock === 0}
+                  style={{ opacity: product.stock === 0 ? 0.5 : 1, cursor: product.stock === 0 ? 'not-allowed' : 'pointer' }}
                 >
-                  <FiShoppingCart /> Add to Cart
+                  <FiShoppingCart /> {product.stock === 0 ? 'Out of Stock' : 'Add to Cart'}
                 </button>
               </div>
             </div>
@@ -285,7 +312,12 @@ export default function Products() {
                 <p style={{ color: 'var(--text-body)', lineHeight: 1.7, fontSize: '1.05rem', margin: 0 }}>{selectedProduct.description || 'No description available for this product. High quality materials and exceptional design make this a perfect choice.'}</p>
                 
                 <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <li style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--text-dark)', fontWeight: 500 }}><FiCheckCircle color="var(--success)" size={20} /> <span style={{ color: 'var(--success)' }}>In stock and ready to ship</span></li>
+                  <li style={{ display: 'flex', alignItems: 'center', gap: 10, fontWeight: 500 }}>
+                    <FiCheckCircle color={selectedProduct.stock > 0 ? 'var(--success)' : '#ef4444'} size={20} />
+                    <span style={{ color: selectedProduct.stock > 0 ? 'var(--success)' : '#ef4444' }}>
+                      {selectedProduct.stock > 0 ? `In stock — ${selectedProduct.stock} unit${selectedProduct.stock > 1 ? 's' : ''} available` : 'Out of Stock'}
+                    </span>
+                  </li>
                   <li style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--text-body)' }}><FiCheckCircle color="var(--primary)" size={20} /> Free shipping on orders over ₹500</li>
                 </ul>
               </div>
@@ -311,17 +343,19 @@ export default function Products() {
               <div style={{ display: 'flex', gap: 16, marginTop: 'auto', paddingTop: 20 }}>
                 <button 
                   className="btn btn-secondary btn-lg" 
-                  style={{ flex: 1, padding: '16px', fontSize: '1.1rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, background: 'var(--accent-light)', color: 'var(--primary)', border: 'none' }}
+                  style={{ flex: 1, padding: '16px', fontSize: '1.1rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, background: selectedProduct.stock === 0 ? 'var(--bg-secondary)' : 'var(--accent-light)', color: selectedProduct.stock === 0 ? 'var(--text-muted)' : 'var(--primary)', border: 'none', opacity: selectedProduct.stock === 0 ? 0.6 : 1, cursor: selectedProduct.stock === 0 ? 'not-allowed' : 'pointer' }}
                   onClick={(e) => handleAddToCart(selectedProduct, e)}
+                  disabled={selectedProduct.stock === 0}
                 >
-                  <FiShoppingCart /> Add to Cart
+                  <FiShoppingCart /> {selectedProduct.stock === 0 ? 'Out of Stock' : 'Add to Cart'}
                 </button>
                 <button 
                   className="btn btn-primary btn-lg" 
-                  style={{ flex: 1, padding: '16px', fontSize: '1.1rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8 }}
+                  style={{ flex: 1, padding: '16px', fontSize: '1.1rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, opacity: selectedProduct.stock === 0 ? 0.6 : 1, cursor: selectedProduct.stock === 0 ? 'not-allowed' : 'pointer' }}
                   onClick={(e) => handleBuyNow(selectedProduct, e)}
+                  disabled={selectedProduct.stock === 0}
                 >
-                  Buy Now
+                  {selectedProduct.stock === 0 ? 'Out of Stock' : 'Buy Now'}
                 </button>
               </div>
             </div>

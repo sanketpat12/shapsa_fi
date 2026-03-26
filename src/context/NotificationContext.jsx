@@ -136,19 +136,46 @@ export function NotificationProvider({ children }) {
         schema: 'public', 
         table: 'orders',
         filter: `${user.role === 'retailer' ? 'retailer_id' : 'customer_id'}=eq.${user.id}`
-      }, (payload) => {
+      }, async (payload) => {
          const order = payload.new;
+         let customerName = 'A customer';
+         if (user.role === 'retailer') {
+           const { data: profile } = await supabase.from('profiles').select('name, email').eq('id', order.customer_id).single();
+           customerName = profile?.name || profile?.email || 'A customer';
+         }
          const notif = {
            id: `notif-placed-${order.id}`,
            type: 'new_order',
            title: user.role === 'retailer' ? 'New Order Received' : 'Order Placed Successfully',
            message: user.role === 'retailer' 
-             ? `An order ${order.id.slice(0,8)} for ₹${order.total_price} was placed.` 
+             ? `${customerName} placed order ${order.id.slice(0,8)} for ₹${order.total_price}.` 
              : `Your order ${order.id.slice(0,8)} for ₹${order.total_price} has been placed.`,
            icon: '🛒',
            time: order.created_at || new Date().toISOString()
          };
          setSourceNotifications(prev => [notif, ...prev].sort((a, b) => new Date(b.time) - new Date(a.time)));
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'orders',
+        filter: `retailer_id=eq.${user.id}`
+      }, async (payload) => {
+        if (user.role !== 'retailer') return;
+        const order = payload.new;
+        if (order.status !== 'Cancelled') return;
+        // Fetch the customer name for the notification
+        const { data: profile } = await supabase.from('profiles').select('name, email').eq('id', order.customer_id).single();
+        const customerName = profile?.name || profile?.email || 'A customer';
+        const notif = {
+          id: `notif-cancelled-${order.id}-${Date.now()}`,
+          type: 'order_cancelled',
+          title: '❌ Order Cancelled',
+          message: `${customerName} cancelled order ${order.id.slice(0,8)}.`,
+          icon: '❌',
+          time: new Date().toISOString()
+        };
+        setSourceNotifications(prev => [notif, ...prev].sort((a, b) => new Date(b.time) - new Date(a.time)));
       })
       .subscribe();
 

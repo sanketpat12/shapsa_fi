@@ -9,6 +9,7 @@ export default function Cart() {
   const { user, cart, removeFromCart, updateCartQuantity, clearCart, cartTotal } = useAuth();
   const [checkingOut, setCheckingOut] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
+  const [stockWarning, setStockWarning] = useState(null);
 
   const handleCheckout = async () => {
     if (!user) return alert('Please log in to checkout');
@@ -69,7 +70,7 @@ export default function Cart() {
         throw new Error(error.message);
       }
 
-      // Save customer profile so retailer can see the name
+      // Save customer profile so retailer sees the name
       await supabase.from('profiles').upsert({
         id: user.id,
         email: user.email,
@@ -140,6 +141,11 @@ export default function Cart() {
         </button>
       </div>
 
+      {stockWarning && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '12px 16px', marginBottom: 16, color: '#dc2626', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
+          ⚠️ {stockWarning}
+        </div>
+      )}
       <div className="cart-layout">
         <div className="cart-items">
           {cart.map(item => (
@@ -162,7 +168,15 @@ export default function Cart() {
                 <span className="qty-value">{item.quantity}</span>
                 <button
                   className="qty-btn"
-                  onClick={() => updateCartQuantity(item.id, item.quantity + 1)}
+                  onClick={() => {
+                    if (item.stock !== undefined && item.quantity >= item.stock) {
+                      setStockWarning(`Only ${item.stock} unit${item.stock > 1 ? 's' : ''} of "${item.name}" available.`);
+                      setTimeout(() => setStockWarning(null), 3000);
+                      return;
+                    }
+                    updateCartQuantity(item.id, item.quantity + 1);
+                  }}
+                  disabled={item.stock !== undefined && item.quantity >= item.stock}
                 >
                   <FiPlus />
                 </button>
