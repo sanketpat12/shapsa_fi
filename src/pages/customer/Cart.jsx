@@ -69,6 +69,24 @@ export default function Cart() {
         throw new Error(error.message);
       }
 
+      // Save customer profile so retailer can see the name
+      await supabase.from('profiles').upsert({
+        id: user.id,
+        email: user.email,
+        name: user.name || user.email,
+        role: user.role || 'customer',
+      }, { onConflict: 'id' });
+
+      // Decrement stock for the purchased items
+      for (const item of cart) {
+        if (item.id) {
+          await supabase.rpc('decrement_stock', {
+            product_id: item.id,
+            qty: item.quantity
+          });
+        }
+      }
+
       setOrderPlaced(true);
       clearCart();
     } catch (err) {

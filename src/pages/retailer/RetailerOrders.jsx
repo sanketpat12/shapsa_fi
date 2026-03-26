@@ -133,7 +133,7 @@ export default function RetailerOrders() {
               filteredOrders.map(order => (
                 <tr key={order.id}>
                   <td style={{ fontWeight: 700, fontSize: '0.8rem', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={order.id}>{order.id}</td>
-                  <td>{order.profiles?.name || order.profiles?.email || 'Unknown Customer'}</td>
+                  <td style={{ fontWeight: 500 }}>{order.profiles?.name && order.profiles.name !== order.profiles.email ? order.profiles.name : (order.profiles?.email || `Customer (${order.customer_id.slice(0, 8)})`)}</td>
                   <td>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       {order.items.map((item, i) => (

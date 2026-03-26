@@ -112,6 +112,15 @@ export default function Products() {
       console.error('Buy Now error:', error);
       alert('Failed to place order: ' + error.message);
     } else {
+      // Decrement stock for this single product
+      if (product.id && product.id.toString().length > 20) {
+        const { data } = await supabase.from('products').select('stock').eq('id', product.id).single();
+        if (data) {
+          const newStock = Math.max(0, data.stock - 1);
+          await supabase.from('products').update({ stock: newStock }).eq('id', product.id);
+        }
+      }
+
       setToast(`Order placed successfully!`);
       setTimeout(() => setToast(null), 3000);
       setSelectedProduct(null); // Close modal
