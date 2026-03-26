@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "start": "node server.js",
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
@@ -11,6 +12,8 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.100.0",
+    "express": "^5.2.1",
+    "http-proxy-middleware": "^3.0.5",
     "i18next": "^25.10.9",
     "i18next-browser-languagedetector": "^8.2.1",
     "react": "^19.2.4",

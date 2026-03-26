@@ -3,7 +3,7 @@
  * Shared utility for all AI features in the app
  */
 
-const NVIDIA_API_URL = "https://corsproxy.io/?https://integrate.api.nvidia.com/v1/chat/completions";
+const NVIDIA_API_URL = "/api/nvidia/v1/chat/completions";
 const NVIDIA_API_KEY = "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";
 const MODEL = "google/gemma-3-27b-it";
 
