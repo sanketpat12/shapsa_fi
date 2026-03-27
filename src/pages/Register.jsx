@@ -82,7 +82,7 @@ export default function Register() {
       return 'Store name is required.';
     if (!name.trim()) return 'Full name is required.';
     if (!email.trim()) return 'Email is required.';
-    if (!/\S+@\S+\.\S+/.test(email)) return 'Please enter a valid email address.';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return 'Please enter a valid email address.';
     if (!password) return 'Password is required.';
     if (password.length < 6) return 'Password must be at least 6 characters.';
     if (password !== confirmPassword) return 'Passwords do not match.';
