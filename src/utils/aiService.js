@@ -111,9 +111,35 @@ export async function callNvidiaAIStream(messages, onChunk, maxTokens = 600) {
  * @param {string} category
  * @returns {Promise<string>} Generated description
  */
-export async function generateProductDescription(productName, category) {
-  const prompt = `Write a compelling, concise product description (2-3 sentences, max 60 words) for a product called "${productName}" in the "${category}" category. Be specific, enthusiastic, and highlight key benefits. Do NOT include any title or label — just the description text itself.`;
-  return await callNvidiaAI(prompt, "", 200);
+export async function generateProductDescription(productName, category, base64Image = null) {
+  if (base64Image) {
+    const prompt = `Write a compelling, concise product description (2-3 sentences, max 60 words) for a product called "${productName}" in the "${category}" category. Describe its visual features based on the image provided. Be specific, enthusiastic, and highlight key benefits. Do NOT include any title or label — just the description text itself.`;
+    return await analyzeImageWithAI(base64Image, prompt);
+  } else {
+    const prompt = `Write a compelling, concise product description (2-3 sentences, max 60 words) for a product called "${productName}" in the "${category}" category. Be specific, enthusiastic, and highlight key benefits. Do NOT include any title or label — just the description text itself.`;
+    return await callNvidiaAI(prompt, "", 200);
+  }
+}
+
+/**
+ * Generate a product category and matching emoji using AI.
+ * @param {string} productName
+ * @param {string} description
+ * @returns {Promise<{category: string, emoji: string}>} Generated category details
+ */
+export async function generateProductCategoryWithEmoji(productName, description) {
+  const prompt = `You are a retail category generator. Given the product name "${productName}" and description "${description}", suggest the single most appropriate short category name (e.g. "Smartphones", "Skincare", "Beverages") and a single matching emoji. 
+Return ONLY a valid JSON object in this exact format, with no markdown formatting or extra text:
+{"category": "Category Name", "emoji": "📱"}`;
+  
+  try {
+    let result = await callNvidiaAI(prompt, "", 100);
+    result = result.replace(/```json/g, "").replace(/```/g, "").trim();
+    return JSON.parse(result);
+  } catch (err) {
+    console.error("AI Category Error:", err);
+    return { category: "Other", emoji: "📦" };
+  }
 }
 
 /**

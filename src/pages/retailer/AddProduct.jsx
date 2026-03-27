@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { categoryKeywords } from '../../data/products';
-import { generateProductDescription } from '../../utils/aiService';
+import { generateProductDescription, generateProductCategoryWithEmoji } from '../../utils/aiService';
 import { FiPlus, FiEdit2, FiTrash2, FiImage, FiCpu, FiTag, FiCheck, FiZap } from 'react-icons/fi';
 import './AddProduct.css';
 
@@ -14,25 +13,6 @@ const categoryEmojis = {
   'Accessories': '🔌', 'Food': '🍔', 'Snacks': '🍿', 'Handcraft': '🎨',
   'Groceries': '🛒', 'Clothing': '👕'
 };
-
-function detectCategories(name, description) {
-  const text = (name + ' ' + description).toLowerCase();
-  const scores = {};
-  for (const [category, keywords] of Object.entries(categoryKeywords)) {
-    let score = 0;
-    for (const kw of keywords) {
-      if (text.includes(kw)) score += kw.split(' ').length > 1 ? 2 : 1;
-    }
-    if (score > 0) scores[category] = score;
-  }
-  return Object.entries(scores)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([cat, score]) => ({
-      category: cat,
-      confidence: Math.min(Math.round((score / 6) * 100), 99)
-    }));
-}
 
 export default function AddProduct() {
   const { user } = useAuth();
@@ -52,6 +32,7 @@ export default function AddProduct() {
   const [aiRan, setAiRan] = useState(false);
   const [selectedAiCat, setSelectedAiCat] = useState(null);
   const debounceRef = useRef(null);
+  const skipCategoryAutoSetRef = useRef(false);
 
   // AI Description Autofill state
   const [aiDescLoading, setAiDescLoading] = useState(false);
@@ -60,8 +41,20 @@ export default function AddProduct() {
     if (!form.name) return;
     setAiDescLoading(true);
     try {
-      const desc = await generateProductDescription(form.name, form.category);
+      let base64Img = null;
+      if (form.imageFile) {
+        base64Img = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(form.imageFile);
+          reader.onload = () => resolve(reader.result.split(',')[1]);
+          reader.onerror = error => reject(error);
+        });
+      }
+      const desc = await generateProductDescription(form.name, form.category, base64Img);
+      
+      skipCategoryAutoSetRef.current = true;
       setForm(prev => ({ ...prev, description: desc.trim() }));
+      setTimeout(() => { skipCategoryAutoSetRef.current = false; }, 2000);
     } catch (err) {
       console.error('AI description error:', err);
     } finally {
@@ -95,19 +88,19 @@ export default function AddProduct() {
       return;
     }
     clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
+    debounceRef.current = setTimeout(async () => {
       setAiLoading(true);
-      setTimeout(() => {
-        const suggestions = detectCategories(form.name, form.description);
-        setAiSuggestions(suggestions);
-        setAiLoading(false);
-        setAiRan(true);
-        if (suggestions.length > 0 && suggestions[0].confidence > 40) {
-          setForm(prev => ({ ...prev, category: suggestions[0].category }));
-          setSelectedAiCat(suggestions[0].category);
-        }
-      }, 600);
-    }, 500);
+      const sug = await generateProductCategoryWithEmoji(form.name, form.description);
+      categoryEmojis[sug.category] = sug.emoji;
+      setAiSuggestions([sug]);
+      setAiLoading(false);
+      setAiRan(true);
+      
+      if (!skipCategoryAutoSetRef.current) {
+        setForm(prev => ({ ...prev, category: sug.category }));
+        setSelectedAiCat(sug.category);
+      }
+    }, 1500);
     return () => clearTimeout(debounceRef.current);
   }, [form.name, form.description]);
 
@@ -230,6 +223,22 @@ export default function AddProduct() {
               </div>
             </div>
 
+            <div className="form-group" style={{ marginBottom: 20 }}>
+              <label>Product Image <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '0.8rem' }}>(helps AI write better descriptions)</span></label>
+              <div className="image-input-group" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <FiImage style={{ color: 'var(--text-muted)' }} />
+                  <input type="file" accept="image/*" className="form-input" style={{ padding: '8px' }}
+                    onChange={handleImageChange} />
+                </div>
+                {form.imageFile && (
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                    Selected: {form.imageFile.name}
+                  </span>
+                )}
+              </div>
+            </div>
+
             <div className="form-group">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                 <label style={{ margin: 0 }}>Description <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '0.8rem' }}>(helps AI detect category)</span></label>
@@ -283,13 +292,10 @@ export default function AddProduct() {
                         <button type="button" key={s.category}
                           className={`ai-suggestion-chip ${form.category === s.category ? 'selected' : ''} ${i === 0 ? 'top-pick' : ''}`}
                           onClick={() => handleAiCatSelect(s.category)}>
-                          <span className="ai-chip-emoji">{categoryEmojis[s.category] || '📦'}</span>
+                          <span className="ai-chip-emoji">{s.emoji || categoryEmojis[s.category] || '📦'}</span>
                           <div className="ai-chip-info">
                             <span className="ai-chip-name">{s.category}</span>
-                            <div className="ai-confidence-bar">
-                              <div className="ai-confidence-fill" style={{ width: `${s.confidence}%` }} />
-                            </div>
-                            <span className="ai-chip-conf">{s.confidence}% match</span>
+                            <span className="ai-chip-conf">AI Generated Match</span>
                           </div>
                           {i === 0 && <span className="ai-top-badge">Top Pick</span>}
                           {form.category === s.category && <FiCheck className="ai-chip-check" />}
@@ -316,21 +322,7 @@ export default function AddProduct() {
               </div>
             </div>
 
-            <div className="form-group" style={{ marginTop: 20 }}>
-              <label>Product Image</label>
-              <div className="image-input-group" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <FiImage style={{ color: 'var(--text-muted)' }} />
-                  <input type="file" accept="image/*" className="form-input" style={{ padding: '8px' }}
-                    onChange={handleImageChange} />
-                </div>
-                {form.imageFile && (
-                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                    Selected: {form.imageFile.name}
-                  </span>
-                )}
-              </div>
-            </div>
+
 
             <div className="add-product-form-footer">
               <div className="selected-category-preview">
