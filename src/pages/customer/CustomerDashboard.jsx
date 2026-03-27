@@ -1,12 +1,47 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { FiArrowRight, FiStar, FiTruck, FiUsers } from 'react-icons/fi';
+import { supabase } from '../../lib/supabase';
+import { FiArrowRight, FiStar, FiTruck, FiUsers, FiShoppingCart } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 import './CustomerDashboard.css';
+import '../customer/Products.css';
 
 export default function CustomerDashboard() {
-  const { user } = useAuth();
+  const { user, addToCart, cart } = useAuth();
   const { t } = useTranslation();
+  const [featuredProducts, setFeaturedProducts] = useState([]);
+  const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    const fetchFeatured = async () => {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(12);
+      if (!error && data) setFeaturedProducts(data);
+    };
+    fetchFeatured();
+  }, []);
+
+  const handleAddToCart = (product, e) => {
+    if (e) e.stopPropagation();
+    if (!product.stock || product.stock <= 0) {
+      setToast(`❌ ${product.name} is out of stock!`);
+      setTimeout(() => setToast(null), 2500);
+      return;
+    }
+    const inCart = cart?.find(i => i.id === product.id);
+    if (inCart && inCart.quantity >= product.stock) {
+      setToast(`❌ Only ${product.stock} unit${product.stock > 1 ? 's' : ''} available!`);
+      setTimeout(() => setToast(null), 2500);
+      return;
+    }
+    addToCart(product);
+    setToast(`✅ ${product.name} added to cart!`);
+    setTimeout(() => setToast(null), 2000);
+  };
 
   return (
     <div className="customer-dashboard">
@@ -109,6 +144,97 @@ export default function CustomerDashboard() {
           </div>
         </section>
 
+        {/* Featured Products Section */}
+        {featuredProducts.length > 0 && (
+          <section className="featured-products-section">
+            <div className="featured-header">
+              <h2 className="section-title">Featured Products</h2>
+              <Link to="/customer/products" className="view-all-link">
+                View All <FiArrowRight />
+              </Link>
+            </div>
+            <div className="products-grid">
+              {featuredProducts.map((product, i) => {
+                const hasDiscount = product.deal_active && product.discount > 0;
+                const discountedPrice = hasDiscount
+                  ? (product.price * (1 - product.discount / 100)).toFixed(0)
+                  : null;
+                return (
+                  <Link
+                    to="/customer/products"
+                    key={product.id}
+                    className="product-card"
+                    style={{ animationDelay: `${i * 0.05}s`, textDecoration: 'none', color: 'inherit' }}
+                  >
+                    {hasDiscount && (
+                      <span className="product-badge" style={{ background: '#ef4444' }}>
+                        🏷️ {product.discount}% OFF
+                      </span>
+                    )}
+                    {!hasDiscount && product.badge && (
+                      <span className="product-badge">{product.badge}</span>
+                    )}
+                    {product.stock === 0 && (
+                      <span className="product-badge" style={{ background: '#6b7280', left: 'auto', right: 12 }}>Out of Stock</span>
+                    )}
+                    <div className="product-img-container">
+                      {product.image ? (
+                        <img src={product.image} alt={product.name} className="product-img" style={{ opacity: product.stock === 0 ? 0.6 : 1 }} />
+                      ) : (
+                        <div className="product-img" style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 48, background: 'var(--bg-secondary)'
+                        }}>📦</div>
+                      )}
+                      {product.stock > 0 && (
+                        <button
+                          className="quick-add-btn"
+                          onClick={(e) => handleAddToCart(product, e)}
+                          title="Add to Cart"
+                        >
+                          <FiShoppingCart />
+                        </button>
+                      )}
+                    </div>
+                    <div className="product-info">
+                      <span className="product-category">{product.category}</span>
+                      <h3 className="product-name">{product.name}</h3>
+                      <p className="product-desc">
+                        {product.description ? product.description.substring(0, 60) + '…' : ''}
+                      </p>
+                      <div className="product-meta">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          {hasDiscount ? (
+                            <>
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textDecoration: 'line-through' }}>
+                                ₹{product.price}
+                              </span>
+                              <span className="product-price" style={{ color: '#16a34a' }}>
+                                ₹{discountedPrice}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="product-price">₹{product.price}</span>
+                          )}
+                        </div>
+                        <span className="product-rating">
+                          <FiStar className="star-filled" /> {product.rating || '—'}
+                        </span>
+                      </div>
+                      <button
+                        className="btn btn-primary btn-sm add-cart-btn"
+                        onClick={(e) => handleAddToCart(product, e)}
+                      >
+                        <FiShoppingCart /> Add to Cart
+                      </button>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
         {/* Features Section */}
         <section className="features-section">
           <div className="feature-card">
@@ -128,6 +254,8 @@ export default function CustomerDashboard() {
           </div>
         </section>
       </div>
+
+      {toast && <div className="toast success">{toast}</div>}
     </div>
   );
 }

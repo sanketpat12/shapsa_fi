@@ -1,6 +1,6 @@
 import { useAuth } from '../../context/AuthContext';
 import { Link } from 'react-router-dom';
-import { FiTrash2, FiMinus, FiPlus, FiShoppingBag, FiArrowRight } from 'react-icons/fi';
+import { FiTrash2, FiMinus, FiPlus, FiShoppingBag, FiArrowRight, FiX } from 'react-icons/fi';
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import './Cart.css';
@@ -10,10 +10,16 @@ export default function Cart() {
   const [checkingOut, setCheckingOut] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [stockWarning, setStockWarning] = useState(null);
-  const [shippingAddress, setShippingAddress] = useState('');
+  
+  // Checkout Modal State
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [checkoutForm, setCheckoutForm] = useState({ name: user?.name || '', address: '', payment: 'Cash on Delivery' });
 
-  const handleCheckout = async () => {
+  const handleCheckoutSubmit = async (e) => {
+    e.preventDefault();
     if (!user) return alert('Please log in to checkout');
+    if (!checkoutForm.name.trim() || !checkoutForm.address.trim()) return alert('Please fill in all required fields');
+    
     setCheckingOut(true);
 
     try {
@@ -61,7 +67,9 @@ export default function Cart() {
           items: items,
           total_price: Number(totalWithTax.toFixed(2)),
           status: 'Pending',
-          shipping_address: shippingAddress
+          shipping_address: checkoutForm.address.trim(),
+          customer_name: checkoutForm.name.trim(),
+          payment_mode: checkoutForm.payment
         };
       });
 
@@ -76,7 +84,7 @@ export default function Cart() {
       await supabase.from('profiles').upsert({
         id: user.id,
         email: user.email,
-        name: user.name || user.email,
+        name: checkoutForm.name.trim(),
         role: user.role || 'customer',
       }, { onConflict: 'id' });
 
@@ -97,6 +105,7 @@ export default function Cart() {
       alert('Failed to place order: ' + err.message);
     } finally {
       setCheckingOut(false);
+      setShowCheckoutModal(false);
     }
   };
 
@@ -217,34 +226,106 @@ export default function Cart() {
               <span>₹{(cartTotal * 1.08).toFixed(2)}</span>
             </div>
           </div>
-          
-          <div style={{ marginBottom: 20 }}>
-            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: 8, color: 'var(--text-dark)' }}>Shipping Address</label>
-            <textarea
-              value={shippingAddress}
-              onChange={(e) => setShippingAddress(e.target.value)}
-              placeholder="Enter your full delivery address..."
-              style={{ width: '100%', padding: '12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-secondary)', resize: 'vertical', minHeight: 80, boxSizing: 'border-box' }}
-              required
-            />
-          </div>
-
           <button
             className="btn btn-primary btn-lg checkout-btn"
-            onClick={() => {
-              if (!shippingAddress.trim()) {
-                alert("Please enter a shipping address before checkout.");
-                return;
-              }
-              handleCheckout();
-            }}
-            disabled={checkingOut}
+            onClick={() => setShowCheckoutModal(true)}
           >
-            {checkingOut ? 'Processing...' : 'Checkout'}
-            {!checkingOut && <FiArrowRight />}
+            Checkout <FiArrowRight />
           </button>
         </div>
       </div>
+
+      {/* ── Checkout Popup Modal ── */}
+      {showCheckoutModal && (
+        <div onClick={() => setShowCheckoutModal(false)} style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 2000, padding: 24
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--bg-white)', borderRadius: 24, padding: 36,
+            maxWidth: 480, width: '100%', boxShadow: '0 32px 64px rgba(0,0,0,0.25)',
+            animation: 'fadeInUp 0.3s ease'
+          }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+              <div>
+                <h2 style={{ margin: 0, fontWeight: 800, fontSize: '1.5rem', color: 'var(--text-dark)' }}>Checkout</h2>
+                <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.88rem' }}>{cart.length} item{cart.length !== 1 ? 's' : ''}</p>
+              </div>
+              <button onClick={() => setShowCheckoutModal(false)} style={{
+                background: 'var(--bg-secondary)', border: 'none', borderRadius: '50%',
+                width: 36, height: 36, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dark)'
+              }}><FiX size={18} /></button>
+            </div>
+
+            {/* Order Summary */}
+            <div style={{ background: 'var(--accent-light)', borderRadius: 12, padding: '14px 18px', marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ fontSize: '2rem' }}>🛒</div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-dark)' }}>Cart Total</div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{cart.length} item(s)</div>
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--primary)' }}>₹{(cartTotal * 1.08).toFixed(2)}</div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>incl. 8% tax</div>
+              </div>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleCheckoutSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-dark)', marginBottom: 6 }}>Full Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Enter your full name"
+                  value={checkoutForm.name}
+                  onChange={e => setCheckoutForm(f => ({ ...f, name: e.target.value }))}
+                  style={{ width: '100%', padding: '12px 16px', border: '2px solid var(--border)', borderRadius: 12, fontSize: '0.95rem', background: 'var(--bg-white)', boxSizing: 'border-box', outline: 'none', transition: 'border-color 0.2s' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-dark)', marginBottom: 6 }}>Delivery Address *</label>
+                <textarea
+                  required
+                  placeholder="House/Flat no., Street, City, PIN code"
+                  value={checkoutForm.address}
+                  onChange={e => setCheckoutForm(f => ({ ...f, address: e.target.value }))}
+                  rows={3}
+                  style={{ width: '100%', padding: '12px 16px', border: '2px solid var(--border)', borderRadius: 12, fontSize: '0.95rem', background: 'var(--bg-white)', resize: 'vertical', boxSizing: 'border-box', outline: 'none', transition: 'border-color 0.2s', fontFamily: 'inherit' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-dark)', marginBottom: 6 }}>Payment Mode *</label>
+                <select
+                  value={checkoutForm.payment}
+                  onChange={e => setCheckoutForm(f => ({ ...f, payment: e.target.value }))}
+                  style={{ width: '100%', padding: '12px 16px', border: '2px solid var(--border)', borderRadius: 12, fontSize: '0.95rem', background: 'var(--bg-white)', cursor: 'pointer', outline: 'none', fontFamily: 'inherit' }}
+                >
+                  <option value="Cash on Delivery">💵 Cash on Delivery</option>
+                  <option value="Online">💳 Online Payment</option>
+                </select>
+              </div>
+              <button
+                type="submit"
+                disabled={checkingOut}
+                style={{
+                  marginTop: 8, padding: '16px', background: checkingOut ? 'var(--text-muted)' : 'var(--primary)',
+                  color: '#fff', border: 'none', borderRadius: 12, fontSize: '1rem', fontWeight: 800,
+                  cursor: checkingOut ? 'not-allowed' : 'pointer', transition: 'all 0.2s',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10
+                }}
+              >
+                {checkingOut ? '⏳ Placing Order…' : `✅ Place Order — ₹${(cartTotal * 1.08).toFixed(2)}`}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

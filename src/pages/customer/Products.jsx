@@ -92,66 +92,74 @@ export default function Products() {
     setTimeout(() => setToast(null), 2000);
   };
 
-  const handleBuyNow = async (product, e) => {
+  // ── Checkout popup state ──
+  const [checkoutProduct, setCheckoutProduct] = useState(null);
+  const [checkoutForm, setCheckoutForm] = useState({ name: '', address: '', payment: 'Cash on Delivery' });
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+
+  const openCheckout = (product, e) => {
     if (e) e.stopPropagation();
     if (!user) return alert('Please log in to purchase');
-    
-    const subtotal = product.price; 
-    const totalWithTax = subtotal * 1.08;
+    if (product.stock <= 0) return alert('Sorry, this product is out of stock!');
+    setCheckoutForm({ name: user.name || '', address: '', payment: 'Cash on Delivery' });
+    setCheckoutProduct(product);
+  };
 
+  const handleSubmitOrder = async (e) => {
+    e.preventDefault();
+    if (!checkoutForm.name.trim()) return alert('Please enter your name');
+    if (!checkoutForm.address.trim()) return alert('Please enter your delivery address');
+    setCheckoutLoading(true);
+
+    const product = checkoutProduct;
+    const totalWithTax = product.price * 1.08;
     let finalRetailerId = product.retailer_id;
-    
-    // Fallback for mock/dummy products: find a real retailer who has added products
+
     if (!finalRetailerId || finalRetailerId.toString().length < 20) {
       const { data: realProds } = await supabase.from('products').select('retailer_id').not('retailer_id', 'is', null).neq('retailer_id', 1).neq('retailer_id', 2).limit(1);
       if (realProds && realProds.length > 0 && realProds[0].retailer_id.length > 20) {
         finalRetailerId = realProds[0].retailer_id;
       } else {
-        return alert("Demo Mode Checkout Failed: No real Retailer accounts found. Please log in as a Retailer, add a new product, and try buying that one!");
+        setCheckoutLoading(false);
+        return alert('Demo Mode: No real Retailer found. Log in as a Retailer, add a product, then try buying it!');
       }
+    }
+
+    const { data: stockData } = await supabase.from('products').select('stock').eq('id', product.id).single();
+    if (stockData && stockData.stock <= 0) {
+      setCheckoutLoading(false);
+      alert('Sorry, this product is out of stock!');
+      return;
     }
 
     const orderToInsert = {
       customer_id: user.id,
       retailer_id: finalRetailerId,
-      items: [{
-        id: product.id,
-        name: product.name,
-        price: product.price,
-        quantity: 1,
-        image: product.image
-      }],
+      customer_name: checkoutForm.name.trim(),
+      shipping_address: checkoutForm.address.trim(),
+      payment_mode: checkoutForm.payment,
+      items: [{ id: product.id, name: product.name, price: product.price, quantity: 1, image: product.image }],
       total_price: Number(totalWithTax.toFixed(2)),
       status: 'Pending'
     };
 
-    // Validate stock before buying
-    const { data: stockData } = await supabase.from('products').select('stock').eq('id', product.id).single();
-    if (stockData && stockData.stock <= 0) {
-      alert('Sorry, this product is out of stock!');
-      return;
-    }
-
     const { error } = await supabase.from('orders').insert([orderToInsert]);
-    
     if (error) {
-      console.error('Buy Now error:', error);
+      console.error('Order error:', error);
       alert('Failed to place order: ' + error.message);
     } else {
-      // Decrement stock via secure RPC
       await supabase.rpc('decrement_stock', { product_id: product.id, qty: 1 });
-      // Save customer profile for retailer
       await supabase.from('profiles').upsert({
-        id: user.id,
-        email: user.email,
-        name: user.name || user.email,
+        id: user.id, email: user.email,
+        name: checkoutForm.name.trim(),
         role: user.role || 'customer',
       }, { onConflict: 'id' });
-
-      setToast(`✅ Order placed successfully!`);
-      setTimeout(() => setToast(null), 3000);
-      setSelectedProduct(null); // Close modal
+      setCheckoutProduct(null);
+      setSelectedProduct(null);
+      setToast(`✅ Order placed! We'll deliver to ${checkoutForm.address.split(',')[0]}`);
+      setTimeout(() => setToast(null), 4000);
     }
+    setCheckoutLoading(false);
   };
 
   return (
@@ -215,8 +223,15 @@ export default function Products() {
               style={{ animationDelay: `${i * 0.05}s`, cursor: 'pointer' }}
               onClick={() => setSelectedProduct(product)}
             >
-              {product.badge && <span className="product-badge">{product.badge}</span>}
-              {product.stock === 0 && <span className="product-badge" style={{ background: '#ef4444' }}>Out of Stock</span>}
+              {product.deal_active && product.discount > 0 && (
+                <span className="product-badge" style={{ background: '#ef4444' }}>
+                  🏷️ {product.discount}% OFF
+                </span>
+              )}
+              {!(product.deal_active && product.discount > 0) && product.badge && (
+                <span className="product-badge">{product.badge}</span>
+              )}
+              {product.stock === 0 && <span className="product-badge" style={{ background: '#ef4444', left: 'auto', right: 12 }}>Out of Stock</span>}
               <div className="product-img-container">
                 {product.image ? (
                   <img src={product.image} alt={product.name} className="product-img" style={{ opacity: product.stock === 0 ? 0.5 : 1 }} />
@@ -244,7 +259,20 @@ export default function Products() {
                   {product.description ? product.description.substring(0, 60) + '…' : ''}
                 </p>
                 <div className="product-meta">
-                  <span className="product-price">₹{product.price}</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {product.deal_active && product.discount > 0 ? (
+                      <>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textDecoration: 'line-through' }}>
+                          ₹{product.price}
+                        </span>
+                        <span className="product-price" style={{ color: '#16a34a' }}>
+                          ₹{(product.price * (1 - product.discount / 100)).toFixed(0)}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="product-price">₹{product.price}</span>
+                    )}
+                  </div>
                   <span className="product-rating">
                     <FiStar className="star-filled" /> {product.rating || '—'}
                   </span>
@@ -359,13 +387,105 @@ export default function Products() {
                 <button 
                   className="btn btn-primary btn-lg" 
                   style={{ flex: 1, padding: '16px', fontSize: '1.1rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, opacity: selectedProduct.stock === 0 ? 0.6 : 1, cursor: selectedProduct.stock === 0 ? 'not-allowed' : 'pointer' }}
-                  onClick={(e) => handleBuyNow(selectedProduct, e)}
+                  onClick={(e) => openCheckout(selectedProduct, e)}
                   disabled={selectedProduct.stock === 0}
                 >
                   {selectedProduct.stock === 0 ? 'Out of Stock' : 'Buy Now'}
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Checkout Popup Modal ── */}
+      {checkoutProduct && (
+        <div onClick={() => setCheckoutProduct(null)} style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 2000, padding: 24
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--bg-white)', borderRadius: 24, padding: 36,
+            maxWidth: 480, width: '100%', boxShadow: '0 32px 64px rgba(0,0,0,0.25)',
+            animation: 'fadeInUp 0.3s ease'
+          }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+              <div>
+                <h2 style={{ margin: 0, fontWeight: 800, fontSize: '1.5rem', color: 'var(--text-dark)' }}>Checkout</h2>
+                <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.88rem' }}>{checkoutProduct.name}</p>
+              </div>
+              <button onClick={() => setCheckoutProduct(null)} style={{
+                background: 'var(--bg-secondary)', border: 'none', borderRadius: '50%',
+                width: 36, height: 36, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dark)'
+              }}><FiX size={18} /></button>
+            </div>
+
+            {/* Order Summary */}
+            <div style={{ background: 'var(--accent-light)', borderRadius: 12, padding: '14px 18px', marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                {checkoutProduct.image && <img src={checkoutProduct.image} alt={checkoutProduct.name} style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover' }} />}
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-dark)' }}>{checkoutProduct.name}</div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Qty: 1</div>
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--primary)' }}>₹{(checkoutProduct.price * 1.08).toFixed(0)}</div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>incl. 8% tax</div>
+              </div>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSubmitOrder} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-dark)', marginBottom: 6 }}>Full Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Enter your full name"
+                  value={checkoutForm.name}
+                  onChange={e => setCheckoutForm(f => ({ ...f, name: e.target.value }))}
+                  style={{ width: '100%', padding: '12px 16px', border: '2px solid var(--border)', borderRadius: 12, fontSize: '0.95rem', background: 'var(--bg-white)', boxSizing: 'border-box', outline: 'none', transition: 'border-color 0.2s' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-dark)', marginBottom: 6 }}>Delivery Address *</label>
+                <textarea
+                  required
+                  placeholder="House/Flat no., Street, City, PIN code"
+                  value={checkoutForm.address}
+                  onChange={e => setCheckoutForm(f => ({ ...f, address: e.target.value }))}
+                  rows={3}
+                  style={{ width: '100%', padding: '12px 16px', border: '2px solid var(--border)', borderRadius: 12, fontSize: '0.95rem', background: 'var(--bg-white)', resize: 'vertical', boxSizing: 'border-box', outline: 'none', transition: 'border-color 0.2s', fontFamily: 'inherit' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-dark)', marginBottom: 6 }}>Payment Mode *</label>
+                <select
+                  value={checkoutForm.payment}
+                  onChange={e => setCheckoutForm(f => ({ ...f, payment: e.target.value }))}
+                  style={{ width: '100%', padding: '12px 16px', border: '2px solid var(--border)', borderRadius: 12, fontSize: '0.95rem', background: 'var(--bg-white)', cursor: 'pointer', outline: 'none', fontFamily: 'inherit' }}
+                >
+                  <option value="Cash on Delivery">💵 Cash on Delivery</option>
+                  <option value="Online">💳 Online Payment</option>
+                </select>
+              </div>
+              <button
+                type="submit"
+                disabled={checkoutLoading}
+                style={{
+                  marginTop: 8, padding: '16px', background: checkoutLoading ? 'var(--text-muted)' : 'var(--primary)',
+                  color: '#fff', border: 'none', borderRadius: 12, fontSize: '1rem', fontWeight: 800,
+                  cursor: checkoutLoading ? 'not-allowed' : 'pointer', transition: 'all 0.2s',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10
+                }}
+              >
+                {checkoutLoading ? '⏳ Placing Order…' : `✅ Place Order — ₹${(checkoutProduct.price * 1.08).toFixed(0)}`}
+              </button>
+            </form>
           </div>
         </div>
       )}

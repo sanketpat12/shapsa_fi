@@ -7,6 +7,7 @@ import {
   FiArrowRight, FiArrowLeft, FiEye, FiEyeOff,
   FiAlertCircle, FiKey, FiHome,
 } from 'react-icons/fi';
+import shopsaLogo from '../assets/shopsa_logo.png';
 import './Register.css';
 
 const ADMIN_SECRET = 'SHOPSA_ADMIN';
@@ -141,8 +142,7 @@ export default function Register() {
         {/* Header */}
         <div className="register-header">
           <div className="register-brand">
-            <span className="register-brand-icon">🛍️</span>
-            <h1>Shopsa</h1>
+            <img src={shopsaLogo} alt="Shopsa" style={{ height: '140px', marginBottom: '12px', objectFit: 'contain' }} />
           </div>
           <p className="register-subtitle">Create your account to get started</p>
         </div>

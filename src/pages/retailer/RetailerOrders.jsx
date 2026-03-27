@@ -21,7 +21,9 @@ export default function RetailerOrders() {
           created_at,
           items,
           customer_id,
-          shipping_address
+          shipping_address,
+          customer_name,
+          payment_mode
         `)
         .eq('retailer_id', user.id)
         .order('created_at', { ascending: false });
@@ -154,7 +156,7 @@ export default function RetailerOrders() {
                   <td style={{ fontWeight: 700, fontSize: '0.8rem', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={order.id}>{order.id}</td>
                   <td>
                     <div style={{ fontWeight: 600, color: 'var(--text-dark)', marginBottom: 2 }}>
-                      {order.profiles?.name && order.profiles.name !== order.profiles.email ? order.profiles.name : 'Customer'}
+                      {order.customer_name || (order.profiles?.name !== order.profiles?.email ? order.profiles?.name : 'Customer')}
                     </div>
                     <div style={{ fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 500 }}>
                       📧 {order.profiles?.email || `ID: ${order.customer_id.slice(0, 8)}`}
@@ -181,6 +183,11 @@ export default function RetailerOrders() {
                   <td>
                     <div style={{ fontWeight: 700 }}>₹{order.total_price}</div>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>(incl. 8% tax)</div>
+                    {order.payment_mode && (
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-body)', marginTop: 4, background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: 4, display: 'inline-block' }}>
+                        💳 {order.payment_mode}
+                      </div>
+                    )}
                   </td>
                   <td>
                     {order.status === 'Cancelled' ? (

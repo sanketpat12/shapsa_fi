@@ -175,6 +175,37 @@
   animation-delay: 2s;
 }
 
+/* ===== FEATURED PRODUCTS ===== */
+.featured-products-section {
+  padding: 0 0 48px;
+}
+
+.featured-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 28px;
+}
+
+.featured-header .section-title {
+  margin-bottom: 0;
+}
+
+.view-all-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: gap 0.2s;
+}
+
+.view-all-link:hover {
+  gap: 10px;
+}
+
 /* ===== CATEGORIES ===== */
 .categories-section {
   padding: 60px 0;

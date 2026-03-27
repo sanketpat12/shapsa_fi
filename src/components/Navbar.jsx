@@ -4,6 +4,7 @@ import { useNotifications } from '../context/NotificationContext';
 import { FiSearch, FiShoppingCart, FiUser, FiLogOut, FiMenu, FiX, FiBell, FiGlobe } from 'react-icons/fi';
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import shopsaLogo from '../assets/shopsa_logo.png';
 import './Navbar.css';
 
 export default function Navbar() {
@@ -88,8 +89,7 @@ export default function Navbar() {
     <nav className="navbar">
       <div className="navbar-inner">
         <Link to={user ? `/${user.role}` : '/login'} className="navbar-brand">
-          <span className="brand-icon">🛍️</span>
-          <span className="brand-text">Shopsa</span>
+          <img src={shopsaLogo} alt="Shopsa" className="brand-logo" style={{ height: '90px', objectFit: 'contain', margin: '-10px 0' }} />
         </Link>
 
         <div className={`navbar-links ${menuOpen ? 'open' : ''}`}>

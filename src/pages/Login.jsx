@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   FiMail, FiLock, FiArrowRight, FiEye, FiEyeOff,
 } from 'react-icons/fi';
+import shopsaLogo from '../assets/shopsa_logo.png';
 import './Login.css';
 
 export default function Login() {
@@ -40,8 +41,7 @@ export default function Login() {
       <div className="login-container">
         <div className="login-header">
           <div className="login-brand">
-            <span className="login-brand-icon">🛍️</span>
-            <h1>Shopsa</h1>
+            <img src={shopsaLogo} alt="Shopsa" style={{ height: '140px', marginBottom: '12px', objectFit: 'contain' }} />
           </div>
           <p className="login-subtitle">Your Smart Shopping Destination</p>
         </div>
